@@ -1,0 +1,328 @@
+// Página de listado de Productos
+'use client'
+
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { formatCurrency, calcularEstadoInventario } from '@/lib/utils'
+import { Card, CardHeader, CardBody } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
+import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table'
+import { ProtectedPrice } from '@/components/ui/ProtectedPrice'
+import { useAuth } from '@/contexts/AuthContext'
+
+interface Producto {
+  id: string
+  nombre: string
+  codigo: string | null
+  unidad: string
+  stockMinimo: number
+  rubro: string | null
+  inventario: { stockActual: number } | null
+  proveedores: Array<{
+    id: string
+    precioCompra: number | null
+    ordenPreferencia: number
+    proveedor: { id: string; nombre: string }
+  }>
+}
+
+export default function ProductosPage() {
+  const router = useRouter()
+  const { canEdit, canSeePrices, canDelete } = useAuth()
+  const [productos, setProductos] = useState<Producto[]>([])
+  const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchProductos() {
+      try {
+        setLoading(true)
+        const response = await fetch('/api/productos?activo=true')
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          console.error('Error al cargar productos:', response.status, errorData)
+          setProductos([])
+          return
+        }
+        
+        const data = await response.json()
+        console.log('Productos recibidos:', data)
+        console.log('Es array?', Array.isArray(data))
+        console.log('Cantidad de productos:', Array.isArray(data) ? data.length : 0)
+        setProductos(Array.isArray(data) ? data : [])
+      } catch (error) {
+        console.error('Error al cargar productos:', error)
+        setProductos([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchProductos()
+  }, [])
+
+  async function handleDelete(id: string) {
+    if (!confirm('¿Estás seguro de que deseas eliminar permanentemente este producto? Esta acción no se puede deshacer.')) {
+      return
+    }
+
+    setDeletingId(id)
+    try {
+      const response = await fetch(`/api/productos/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }))
+        throw new Error(errorData.error || 'Error al eliminar producto')
+      }
+
+      // Refrescar la lista
+      await fetchProductos()
+      router.refresh()
+    } catch (error: any) {
+      console.error('Error al eliminar producto:', error)
+      alert(error?.message || 'Error al eliminar el producto')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  async function fetchProductos() {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/productos?activo=true')
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Error al cargar productos:', response.status, errorData)
+        setProductos([])
+        return
+      }
+      
+      const data = await response.json()
+      console.log('Productos recibidos:', data)
+      console.log('Es array?', Array.isArray(data))
+      console.log('Cantidad de productos:', Array.isArray(data) ? data.length : 0)
+      setProductos(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error('Error al cargar productos:', error)
+      setProductos([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-neutral-600">Cargando...</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold text-[#111111]" style={{ fontWeight: 600, lineHeight: 1.5, letterSpacing: '-0.01em' }}>Productos</h1>
+          <p className="text-neutral-600 mt-1">
+            Catálogo de productos y configuración
+          </p>
+        </div>
+        {canEdit() && (
+          <Link href="/productos/nuevo">
+            <Button>
+              + Nuevo Producto
+            </Button>
+          </Link>
+        )}
+      </div>
+
+      {/* Empty State */}
+      {productos.length === 0 ? (
+        <Card>
+          <CardBody className="text-center py-16">
+            <h3 className="text-xl font-semibold text-[#111111] mb-2" style={{ fontWeight: 600, lineHeight: 1.5, letterSpacing: '-0.01em' }}>
+              No hay productos registrados
+            </h3>
+            <p className="text-neutral-600 mb-6 max-w-md mx-auto">
+              Comienza agregando tu primer producto al sistema.
+            </p>
+            <Link href="/productos/nuevo">
+              <Button size="lg">
+                Crear primer producto
+              </Button>
+            </Link>
+          </CardBody>
+        </Card>
+      ) : (
+        /* Table */
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-neutral-900">
+                Listado de Productos
+              </h2>
+              <div className="text-sm text-neutral-600">
+                {productos.length} {productos.length === 1 ? 'producto' : 'productos'}
+              </div>
+            </div>
+          </CardHeader>
+          <CardBody className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableCell header>Producto</TableCell>
+                  <TableCell header>Proveedores</TableCell>
+                  <TableCell header>Unidad</TableCell>
+                  <TableCell header>Stock Actual</TableCell>
+                  <TableCell header>Stock Mínimo</TableCell>
+                  <TableCell header>Estado</TableCell>
+                  {canSeePrices() && <TableCell header>Precios</TableCell>}
+                  {canEdit() && <TableCell header className="text-right">Acciones</TableCell>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {productos.map((producto) => {
+                  const stockActual = producto.inventario?.stockActual || 0
+                  const estado = calcularEstadoInventario(
+                    stockActual,
+                    producto.stockMinimo
+                  )
+                  return (
+                    <TableRow key={producto.id}>
+                      <TableCell>
+                        <div className="font-medium text-neutral-900">
+                          {producto.nombre}
+                        </div>
+                        {producto.codigo && (
+                          <div className="text-sm text-neutral-500">
+                            {producto.codigo}
+                          </div>
+                        )}
+                        {producto.rubro && (
+                          <div className="mt-1">
+                            <Badge variant="neutral" className="text-xs">
+                              {producto.rubro}
+                            </Badge>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {producto.proveedores.length > 0 ? (
+                          <div className="space-y-1">
+                            {producto.proveedores.map((pp, idx) => (
+                              <div key={pp.id} className="text-sm">
+                                <span className="text-neutral-600">
+                                  {pp.proveedor.nombre}
+                                </span>
+                                {pp.ordenPreferencia === 1 && (
+                                  <Badge variant="primary" className="ml-2 text-xs">
+                                    1°
+                                  </Badge>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-neutral-400 text-sm">Sin proveedores</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-neutral-600">
+                          {producto.unidad}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium text-neutral-900">
+                          {stockActual.toFixed(2)} {producto.unidad}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-neutral-600">
+                          {producto.stockMinimo.toFixed(2)} {producto.unidad}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {estado === 'OK' ? (
+                          <Badge variant="success">OK</Badge>
+                        ) : (
+                          <Badge variant="warning">Reposición</Badge>
+                        )}
+                      </TableCell>
+                      {canSeePrices() && (
+                        <TableCell>
+                          {producto.proveedores.length > 0 ? (
+                            <div className="space-y-1">
+                              {producto.proveedores
+                                .filter(pp => pp.precioCompra !== null)
+                                .sort((a, b) => (a.precioCompra || 0) - (b.precioCompra || 0))
+                                .map((pp, idx) => {
+                                  const isCheapest = idx === 0 && producto.proveedores.filter(p => p.precioCompra !== null).length > 1
+                                  return (
+                                    <div key={pp.id} className="text-sm">
+                                      <ProtectedPrice
+                                        value={pp.precioCompra}
+                                        formatter={formatCurrency}
+                                        fallback={<span className="text-neutral-400">-</span>}
+                                        className={isCheapest ? 'font-medium text-terracotta-700' : 'text-neutral-600'}
+                                      />
+                                      {isCheapest && canSeePrices() && (
+                                        <span className="ml-1 text-xs text-terracotta-600">↓</span>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              {producto.proveedores.filter(pp => pp.precioCompra === null).length > 0 && (
+                                <div className="text-xs text-neutral-400">
+                                  {producto.proveedores.filter(pp => pp.precioCompra === null).length} sin precio
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-neutral-400 text-sm">-</span>
+                          )}
+                        </TableCell>
+                      )}
+                      {canEdit() && (
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end space-x-3">
+                            <Link
+                              href={`/productos/${producto.id}`}
+                              className="text-terracotta-600 hover:text-terracotta-700 font-medium text-sm"
+                            >
+                              Ver
+                            </Link>
+                            <Link
+                              href={`/productos/${producto.id}/editar`}
+                              className="text-neutral-600 hover:text-neutral-900 font-medium text-sm"
+                            >
+                              Editar
+                            </Link>
+                            {canDelete() && (
+                              <button
+                                onClick={() => handleDelete(producto.id)}
+                                disabled={deletingId === producto.id}
+                                className="text-red-600 hover:text-red-700 font-medium text-sm disabled:opacity-50"
+                              >
+                                {deletingId === producto.id ? 'Eliminando...' : 'Eliminar'}
+                              </button>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </CardBody>
+        </Card>
+      )}
+    </div>
+  )
+}

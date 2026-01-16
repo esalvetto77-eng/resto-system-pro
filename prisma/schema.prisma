@@ -1,0 +1,474 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Proveedor {
+  id            String              @id @default(cuid())
+  nombre        String
+  contacto      String?
+  telefono      String?
+  email         String?
+  direccion     String?
+  diasPedido    String
+  horarioPedido String?
+  diasEntrega   String
+  activo        Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  minimoCompra  Float?
+  rubro         String?
+  metodoPago    String?
+  pedidos       Pedido[]
+  productos     ProductoProveedor[]
+
+  @@index([activo])
+  @@index([rubro])
+  @@map("proveedores")
+}
+
+model Producto {
+  id          String              @id @default(cuid())
+  nombre      String
+  codigo      String?             @unique
+  descripcion String?
+  unidad      String
+  stockMinimo Float               @default(0)
+  rubro       String?
+  activo      Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  inventario  Inventario?
+  itemsPedido ItemPedido[]
+  proveedores ProductoProveedor[]
+  recetas     RecetaIngrediente[]
+
+  @@index([activo])
+  @@index([rubro])
+  @@map("productos")
+}
+
+model ProductoProveedor {
+  id               String    @id @default(cuid())
+  productoId       String
+  proveedorId      String
+  precioCompra     Float?
+  ordenPreferencia Int       @default(1)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  proveedor        Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
+  producto         Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  @@unique([productoId, proveedorId])
+  @@index([productoId])
+  @@index([proveedorId])
+  @@index([productoId, ordenPreferencia])
+  @@map("producto_proveedor")
+}
+
+model Inventario {
+  id                  String   @id @default(cuid())
+  productoId          String   @unique
+  stockActual         Float    @default(0)
+  ultimaActualizacion DateTime @default(now()) @updatedAt
+  producto            Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+
+  @@map("inventario")
+}
+
+model Pedido {
+  id            String       @id @default(cuid())
+  proveedorId   String
+  fechaCreacion DateTime     @default(now())
+  fechaPedido   DateTime?
+  fechaEntrega  DateTime?
+  estado        String       @default("BORRADOR")
+  observaciones String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  items         ItemPedido[]
+  proveedor     Proveedor    @relation(fields: [proveedorId], references: [id])
+
+  @@index([proveedorId])
+  @@index([estado])
+  @@index([fechaCreacion])
+  @@map("pedidos")
+}
+
+model ItemPedido {
+  id               String   @id @default(cuid())
+  pedidoId         String
+  productoId       String
+  cantidadSugerida Float
+  cantidadFinal    Float
+  precioUnitario   Float?
+  createdAt        DateTime @default(now())
+  producto         Producto @relation(fields: [productoId], references: [id])
+  pedido           Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  @@index([pedidoId])
+  @@index([productoId])
+  @@map("items_pedido")
+}
+
+model Restaurante {
+  id                         String                   @id @default(cuid())
+  nombre                     String
+  ubicacion                  String?
+  activo                     Boolean                  @default(true)
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+  ajustesTurno               AjusteTurno[]
+  calculosHoras              CalculoHoras[]
+  empleados                  EmpleadoRestaurante[]
+  eventosMensuales           EventoMensual[]
+  liquidacionesProfesionales LiquidacionProfesional[]
+  ventas                     Venta[]
+
+  @@index([activo])
+  @@map("restaurantes")
+}
+
+model Empleado {
+  id                            String                   @id @default(cuid())
+  nombre                        String
+  apellido                      String
+  dni                           String?                  @unique
+  telefono                      String?
+  email                         String?
+  direccion                     String?
+  tipoSueldo                    String
+  sueldo                        Float?
+  valorHoraExtra                Float?
+  cargo                         String?
+  tipoRemuneracion              String?
+  sueldoBaseMensual             Float?
+  valorJornal                   Float?
+  valorHoraNormal               Float?
+  ticketAlimentacion            Boolean                  @default(false)
+  valorTicketDiario             Float?
+  diasDescanso                  String?
+  horarioEntrada                String?
+  horarioSalida                 String?
+  carnetManipulacionEmision     DateTime?
+  carnetManipulacionVencimiento DateTime?
+  carnetSaludEmision            DateTime?
+  carnetSaludVencimiento        DateTime?
+  cuentaBancaria                String?
+  nombreBanco                   String?
+  fechaIngreso                  DateTime                 @default(now())
+  fechaBaja                     DateTime?
+  activo                        Boolean                  @default(true)
+  createdAt                     DateTime                 @default(now())
+  updatedAt                     DateTime                 @updatedAt
+  ajustesTurno                  AjusteTurno[]
+  asistencias                   Asistencia[]
+  calculosHoras                 CalculoHoras[]
+  documentos                    DocumentoEmpleado[]
+  restaurantes                  EmpleadoRestaurante[]
+  eventosMensuales              EventoMensual[]
+  faltas                        Falta[]
+  incidentes                    Incidente[]
+  liquidacionesProfesionales    LiquidacionProfesional[]
+  observaciones                 ObservacionEmpleado[]
+  suspensiones                  Suspension[]
+
+  @@index([activo])
+  @@index([tipoSueldo])
+  @@map("empleados")
+}
+
+model EmpleadoRestaurante {
+  id            String      @id @default(cuid())
+  empleadoId    String
+  restauranteId String
+  createdAt     DateTime    @default(now())
+  restaurante   Restaurante @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+  empleado      Empleado    @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@unique([empleadoId, restauranteId])
+  @@index([empleadoId])
+  @@index([restauranteId])
+  @@map("empleado_restaurante")
+}
+
+model Asistencia {
+  id            String    @id @default(cuid())
+  empleadoId    String
+  fecha         DateTime
+  horaEntrada   DateTime?
+  horaSalida    DateTime?
+  observaciones String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  empleado      Empleado  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+  @@index([fecha])
+  @@map("asistencias")
+}
+
+model Incidente {
+  id          String   @id @default(cuid())
+  empleadoId  String
+  fecha       DateTime
+  tipo        String
+  descripcion String
+  severidad   String?
+  createdAt   DateTime @default(now())
+  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+  @@index([fecha])
+  @@map("incidentes")
+}
+
+model Falta {
+  id          String   @id @default(cuid())
+  empleadoId  String
+  fecha       DateTime
+  justificada Boolean  @default(false)
+  motivo      String?
+  createdAt   DateTime @default(now())
+  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+  @@index([fecha])
+  @@map("faltas")
+}
+
+model ObservacionEmpleado {
+  id          String   @id @default(cuid())
+  empleadoId  String
+  fecha       DateTime
+  titulo      String
+  descripcion String
+  createdAt   DateTime @default(now())
+  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+  @@index([fecha])
+  @@map("observaciones_empleado")
+}
+
+model AjusteTurno {
+  id               String      @id @default(cuid())
+  empleadoId       String
+  restauranteId    String
+  fecha            DateTime
+  tipoAjuste       String
+  minutosAfectados Int?
+  observacion      String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  restaurante      Restaurante @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+  empleado         Empleado    @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+  @@index([restauranteId])
+  @@index([fecha])
+  @@map("ajustes_turno")
+}
+
+model CalculoHoras {
+  id               String      @id @default(cuid())
+  empleadoId       String
+  restauranteId    String
+  fechaInicio      DateTime
+  fechaFin         DateTime
+  horasBase        Float       @default(0)
+  horasExtra       Float       @default(0)
+  horasTrabajadas  Float       @default(0)
+  horasDescontadas Float       @default(0)
+  diasTrabajados   Int         @default(0)
+  diasCompletos    Int         @default(0)
+  diasMedios       Int         @default(0)
+  faltas           Int         @default(0)
+  montoBase        Float       @default(0)
+  montoHorasExtra  Float       @default(0)
+  montoDescuentos  Float       @default(0)
+  totalPagar       Float       @default(0)
+  observaciones    String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  restaurante      Restaurante @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+  empleado         Empleado    @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+  @@index([restauranteId])
+  @@index([fechaInicio])
+  @@index([fechaFin])
+  @@map("calculos_horas")
+}
+
+model EventoMensual {
+  id            String      @id @default(cuid())
+  empleadoId    String
+  restauranteId String
+  mes           Int
+  anio          Int
+  fecha         DateTime
+  tipoEvento    String
+  cantidad      Float?
+  valorUnitario Float?
+  monto         Float       @default(0)
+  observacion   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  restaurante   Restaurante @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+  empleado      Empleado    @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+  @@index([restauranteId])
+  @@index([mes, anio])
+  @@index([fecha])
+  @@map("eventos_mensuales")
+}
+
+model LiquidacionProfesional {
+  id                       String      @id @default(cuid())
+  empleadoId               String
+  restauranteId            String
+  mes                      Int
+  anio                     Int
+  fechaCierre              DateTime
+  liquidoPactado           Float       @default(0)
+  nominalCalculado         Float       @default(0)
+  diferenciaLiquido        Float       @default(0)
+  sueldoBasico             Float       @default(0)
+  jornalesDescontados      Float       @default(0)
+  horasExtras              Float       @default(0)
+  montoHorasExtras         Float       @default(0)
+  ticketAlimentacion       Float       @default(0)
+  diasTicket               Int         @default(0)
+  totalHaberes             Float       @default(0)
+  totalGravado             Float       @default(0)
+  aporteJubilatorio        Float       @default(0)
+  frl                      Float       @default(0)
+  seguroEnfermedad         Float       @default(0)
+  snis                     Float       @default(0)
+  irpfBaseImponible        Float       @default(0)
+  irpfAdelantado           Float?
+  irpfMesesSinIRPF         Int?
+  irpfMonto                Float       @default(0)
+  totalDescuentosLegales   Float       @default(0)
+  adelantosEfectivo        Float       @default(0)
+  adelantosConsumiciones   Float       @default(0)
+  descuentosManuales       Float       @default(0)
+  totalDescuentosGenerales Float       @default(0)
+  totalDescuentos          Float       @default(0)
+  liquidoACobrar           Float       @default(0)
+  redondeo                 Float?
+  observaciones            String?
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
+  restaurante              Restaurante @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+  empleado                 Empleado    @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@unique([empleadoId, restauranteId, mes, anio])
+  @@index([empleadoId])
+  @@index([restauranteId])
+  @@index([mes, anio])
+  @@map("liquidaciones_profesionales")
+}
+
+model Suspension {
+  id          String    @id @default(cuid())
+  empleadoId  String
+  fechaInicio DateTime
+  fechaFin    DateTime?
+  motivo      String
+  createdAt   DateTime  @default(now())
+  empleado    Empleado  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+  @@index([fechaInicio])
+  @@map("suspensiones")
+}
+
+model DocumentoEmpleado {
+  id          String   @id @default(cuid())
+  empleadoId  String
+  nombre      String
+  tipo        String
+  ruta        String
+  descripcion String?
+  createdAt   DateTime @default(now())
+  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+  @@map("documentos_empleado")
+}
+
+model Receta {
+  id            String              @id @default(cuid())
+  nombre        String
+  descripcion   String?
+  porciones     Int                 @default(1)
+  categoria     String?
+  instrucciones String?
+  activo        Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  ingredientes  RecetaIngrediente[]
+
+  @@index([activo])
+  @@index([categoria])
+  @@map("recetas")
+}
+
+model RecetaIngrediente {
+  id         String   @id @default(cuid())
+  recetaId   String
+  productoId String
+  cantidad   Float
+  orden      Int      @default(0)
+  notas      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  producto   Producto @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  receta     Receta   @relation(fields: [recetaId], references: [id], onDelete: Cascade)
+
+  @@unique([recetaId, productoId])
+  @@index([recetaId])
+  @@index([productoId])
+  @@index([recetaId, orden])
+  @@map("receta_ingrediente")
+}
+
+model Usuario {
+  id        String   @id @default(cuid())
+  nombre    String
+  email     String   @unique
+  password  String
+  rol       String   @default("ENCARGADO")
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([rol])
+  @@index([activo])
+  @@map("usuarios")
+}
+
+model Venta {
+  id            String      @id @default(cuid())
+  restauranteId String
+  fecha         DateTime    @default(now())
+  monto         Float
+  tipoTurno     String      // 'DAY' o 'NIGHT'
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  restaurante   Restaurante @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
+
+  @@index([restauranteId])
+  @@index([fecha])
+  @@index([tipoTurno])
+  @@index([fecha, tipoTurno])
+  @@map("ventas")
+}

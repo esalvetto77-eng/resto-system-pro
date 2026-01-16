@@ -1,0 +1,397 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+
+const UNIDADES = [
+  'kg',
+  'g',
+  'litro',
+  'ml',
+  'unidad',
+  'paquete',
+  'caja',
+  'bolsa',
+  'botella',
+]
+
+const RUBROS = [
+  'secos',
+  'pescados',
+  'bebidas',
+  'limpieza',
+  'descartables',
+  'carnes',
+  'verduras',
+  'otros',
+]
+
+export default function NuevoProductoPage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const [proveedores, setProveedores] = useState<
+    Array<{ id: string; nombre: string }>
+  >([])
+  const [formData, setFormData] = useState({
+    nombre: '',
+    codigo: '',
+    descripcion: '',
+    unidad: 'kg',
+    stockMinimo: 0,
+    rubro: '',
+    stockInicial: 0,
+    activo: true,
+  })
+  const [proveedoresProducto, setProveedoresProducto] = useState<
+    Array<{ proveedorId: string; precioCompra: number | null; ordenPreferencia: number }>
+  >([{ proveedorId: '', precioCompra: null, ordenPreferencia: 1 }])
+
+  useEffect(() => {
+    async function fetchProveedores() {
+      try {
+        const response = await fetch('/api/proveedores?activo=true')
+        const data = await response.json()
+        setProveedores(data)
+      } catch (error) {
+        console.error('Error al cargar proveedores:', error)
+      }
+    }
+    fetchProveedores()
+  }, [])
+
+  const addProveedor = () => {
+    setProveedoresProducto([
+      ...proveedoresProducto,
+      {
+        proveedorId: '',
+        precioCompra: null,
+        ordenPreferencia: proveedoresProducto.length + 1,
+      },
+    ])
+  }
+
+  const removeProveedor = (index: number) => {
+    const nuevos = proveedoresProducto.filter((_, i) => i !== index)
+    // Reordenar preferencias
+    nuevos.forEach((p, i) => {
+      p.ordenPreferencia = i + 1
+    })
+    setProveedoresProducto(nuevos)
+  }
+
+  const updateProveedor = (
+    index: number,
+    field: 'proveedorId' | 'precioCompra' | 'ordenPreferencia',
+    value: string | number | null
+  ) => {
+    const nuevos = [...proveedoresProducto]
+    if (field === 'precioCompra') {
+      nuevos[index].precioCompra = value === '' ? null : Number(value)
+    } else if (field === 'ordenPreferencia') {
+      nuevos[index].ordenPreferencia = Number(value)
+    } else {
+      nuevos[index].proveedorId = value as string
+    }
+    setProveedoresProducto(nuevos)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Filtrar proveedores válidos
+    const proveedoresValidos = proveedoresProducto.filter(
+      (p) => p.proveedorId !== ''
+    )
+
+    if (proveedoresValidos.length === 0) {
+      alert('Debe agregar al menos un proveedor')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const response = await fetch('/api/productos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          proveedores: proveedoresValidos,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Error al crear producto')
+      }
+
+      router.push('/productos')
+      router.refresh()
+    } catch (error: any) {
+      console.error('Error:', error)
+      alert(error.message || 'Error al crear el producto')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-neutral-900">
+            Nuevo Producto
+          </h1>
+          <p className="text-neutral-600 mt-1">
+            Agregar un nuevo producto al catálogo
+          </p>
+        </div>
+        <Link href="/productos" className="btn btn-ghost">
+          Cancelar
+        </Link>
+      </div>
+
+      <form onSubmit={handleSubmit} className="card">
+        <div className="card-body space-y-6">
+          {/* Información Básica */}
+          <div>
+            <h2 className="text-lg font-semibold text-neutral-900 mb-4">
+              Información Básica
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Nombre *</label>
+                <input
+                  type="text"
+                  required
+                  className="input"
+                  value={formData.nombre}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nombre: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="label">Código</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={formData.codigo}
+                  onChange={(e) =>
+                    setFormData({ ...formData, codigo: e.target.value })
+                  }
+                  placeholder="Código interno opcional"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="label">Descripción</label>
+                <textarea
+                  className="input"
+                  rows={3}
+                  value={formData.descripcion}
+                  onChange={(e) =>
+                    setFormData({ ...formData, descripcion: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="label">Unidad *</label>
+                <select
+                  required
+                  className="input"
+                  value={formData.unidad}
+                  onChange={(e) =>
+                    setFormData({ ...formData, unidad: e.target.value })
+                  }
+                >
+                  {UNIDADES.map((unidad) => (
+                    <option key={unidad} value={unidad}>
+                      {unidad}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Rubro</label>
+                <select
+                  className="input"
+                  value={formData.rubro}
+                  onChange={(e) =>
+                    setFormData({ ...formData, rubro: e.target.value })
+                  }
+                >
+                  <option value="">Seleccionar rubro</option>
+                  {RUBROS.map((rubro) => (
+                    <option key={rubro} value={rubro}>
+                      {rubro.charAt(0).toUpperCase() + rubro.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Proveedores */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-neutral-900">
+                Proveedores y Precios
+              </h2>
+              <button
+                type="button"
+                onClick={addProveedor}
+                className="text-sm text-terracotta-600 hover:text-terracotta-700 font-medium"
+              >
+                + Agregar Proveedor
+              </button>
+            </div>
+            <div className="space-y-4">
+              {proveedoresProducto.map((prov, index) => (
+                <div
+                  key={index}
+                  className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border border-neutral-200 rounded-soft"
+                >
+                  <div>
+                    <label className="label">Proveedor *</label>
+                    <select
+                      required
+                      className="input"
+                      value={prov.proveedorId}
+                      onChange={(e) =>
+                        updateProveedor(index, 'proveedorId', e.target.value)
+                      }
+                    >
+                      <option value="">Seleccionar</option>
+                      {proveedores.map((proveedor) => (
+                        <option key={proveedor.id} value={proveedor.id}>
+                          {proveedor.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Precio</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="input"
+                      value={prov.precioCompra || ''}
+                      onChange={(e) =>
+                        updateProveedor(index, 'precioCompra', e.target.value)
+                      }
+                      placeholder="Opcional"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Orden</label>
+                    <input
+                      type="number"
+                      min="1"
+                      className="input"
+                      value={prov.ordenPreferencia}
+                      onChange={(e) =>
+                        updateProveedor(
+                          index,
+                          'ordenPreferencia',
+                          e.target.value
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    {proveedoresProducto.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeProveedor(index)}
+                        className="text-sm text-red-600 hover:text-red-700 font-medium"
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-neutral-500 mt-2">
+              Orden: 1 = primera opción, 2 = segunda opción, etc.
+            </p>
+          </div>
+
+          {/* Stock */}
+          <div>
+            <h2 className="text-lg font-semibold text-neutral-900 mb-4">
+              Stock
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Stock Mínimo *</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="0.01"
+                  className="input"
+                  value={formData.stockMinimo}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      stockMinimo: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="label">Stock Inicial</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="input"
+                  value={formData.stockInicial}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      stockInicial: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Estado */}
+          <div>
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.activo}
+                onChange={(e) =>
+                  setFormData({ ...formData, activo: e.target.checked })
+                }
+                className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="text-sm font-medium text-neutral-700">
+                Producto activo
+              </span>
+            </label>
+          </div>
+
+          {/* Botones */}
+          <div className="flex justify-end space-x-4 pt-4 border-t border-neutral-200">
+            <Link href="/productos" className="btn btn-ghost">
+              Cancelar
+            </Link>
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn btn-primary"
+            >
+              {loading ? 'Guardando...' : 'Crear Producto'}
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  )
+}
