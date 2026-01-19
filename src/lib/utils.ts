@@ -49,6 +49,10 @@ export function parseJSON<T>(json: string | null | undefined, defaultValue: T): 
   }
 }
 
+export function cn(...classes: (string | undefined | null | false)[]) {
+  return classes.filter(Boolean).join(" ")
+}
+
 export function calcularEstadoInventario(stockActual: number, stockMinimo: number): 'OK' | 'REPOSICION' {
   return stockActual >= stockMinimo ? 'OK' : 'REPOSICION'
 }
