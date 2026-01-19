@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { useRestaurante } from '@/contexts/RestauranteContext'
+import { useRestaurante } from '@/contexts/RestauranteContext.tsx'
 import { useAuth } from '@/contexts/AuthContext'
 
 export const dynamic = 'force-dynamic'

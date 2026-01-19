@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { formatCurrency, calcularEstadoInventario } from '@/lib/utils'
+import { formatCurrency, calcularEstadoInventario } from '@/lib/utils.ts'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'

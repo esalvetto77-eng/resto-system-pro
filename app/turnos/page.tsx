@@ -2,8 +2,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRestaurante } from '@/contexts/RestauranteContext'
-import { calcularHorarioTurno } from '@/lib/utils'
+import { useRestaurante } from '@/contexts/RestauranteContext.tsx'
+import { calcularHorarioTurno } from '@/lib/utils.ts'
 import Link from 'next/link'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'

@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useRestaurante } from '@/contexts/RestauranteContext'
+import { useRestaurante } from '@/contexts/RestauranteContext.tsx'
 import { AdminOnly } from '@/components/guards/AdminOnly'
 
 const TIPOS_EVENTO = [

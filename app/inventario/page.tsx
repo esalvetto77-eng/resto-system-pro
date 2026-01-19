@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { calcularEstadoInventario, formatDateShort, formatCurrency } from '@/lib/utils'
+import { calcularEstadoInventario, formatDateShort, formatCurrency } from '@/lib/utils.ts'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { parseJSON, formatCurrency } from '@/lib/utils'
+import { parseJSON, formatCurrency } from '@/lib/utils.ts'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface ProveedorDetailClientProps {

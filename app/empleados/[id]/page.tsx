@@ -13,7 +13,7 @@ import {
   calcularHorasTrabajadas,
   fechaVencida,
   fechaVencePronto,
-} from '@/lib/utils'
+} from '@/lib/utils.ts'
 
 interface Asistencia {
   id: string

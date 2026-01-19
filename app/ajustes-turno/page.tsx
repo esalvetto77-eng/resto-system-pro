@@ -3,8 +3,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRestaurante } from '@/contexts/RestauranteContext'
-import { formatDateShort } from '@/lib/utils'
+import { useRestaurante } from '@/contexts/RestauranteContext.tsx'
+import { formatDateShort } from '@/lib/utils.ts'
 // Ajustes de turno: Todos pueden crear/editar (no se requieren restricciones)
 
 interface AjusteTurno {

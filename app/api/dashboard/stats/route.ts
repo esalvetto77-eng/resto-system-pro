@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
-import { calcularEstadoInventario } from '@/lib/utils'
+import { calcularEstadoInventario } from '@/lib/utils.ts'
 
 // CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
 export const runtime = 'nodejs'

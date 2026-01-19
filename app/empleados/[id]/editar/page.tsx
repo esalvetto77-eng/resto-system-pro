@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { parseJSON } from '@/lib/utils'
+import { parseJSON } from '@/lib/utils.ts'
 import { useAuth } from '@/contexts/AuthContext'
 
 const TIPOS_SUELDO = ['MENSUAL', 'JORNAL']

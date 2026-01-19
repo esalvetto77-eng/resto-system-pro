@@ -3,8 +3,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRestaurante } from '@/contexts/RestauranteContext'
-import { formatCurrency, formatDateShort } from '@/lib/utils'
+import { useRestaurante } from '@/contexts/RestauranteContext.tsx'
+import { formatCurrency, formatDateShort } from '@/lib/utils.ts'
 
 interface CalculoHoras {
   id: string

@@ -1,7 +1,7 @@
 // API para obtener planilla semanal de turnos
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { parseJSON } from '@/lib/utils'
+import { parseJSON } from '@/lib/utils.ts'
 
 // CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
 export const runtime = 'nodejs'

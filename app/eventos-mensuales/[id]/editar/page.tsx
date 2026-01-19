@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useRestaurante } from '@/contexts/RestauranteContext'
+import { useRestaurante } from '@/contexts/RestauranteContext.tsx'
 
 const TIPOS_EVENTO = [
   { value: 'HORAS_EXTRA', label: 'Horas Extra' },

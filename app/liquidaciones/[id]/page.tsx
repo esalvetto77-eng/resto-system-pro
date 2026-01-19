@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { formatCurrency, formatDateShort } from '@/lib/utils'
+import { formatCurrency, formatDateShort } from '@/lib/utils.ts'
 
 interface CalculoHoras {
   id: string

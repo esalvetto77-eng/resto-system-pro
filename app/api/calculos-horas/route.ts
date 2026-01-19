@@ -1,7 +1,7 @@
 // API Route para cálculos de horas trabajadas y liquidaciones
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { parseJSON } from '@/lib/utils'
+import { parseJSON } from '@/lib/utils.ts'
 import { calcularHorasPeriodo, calcularSueldo } from '@/lib/calculoHoras'
 
 // CRÍTICO: Usar Node.js runtime para Prisma (no Edge)

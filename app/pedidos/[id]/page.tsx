@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { formatDateShort, formatCurrency } from '@/lib/utils'
+import { formatDateShort, formatCurrency } from '@/lib/utils.ts'
 import { ProtectedPrice } from '@/components/ui/ProtectedPrice'
 import { useAuth } from '@/contexts/AuthContext'
 

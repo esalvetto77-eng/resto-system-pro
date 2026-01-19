@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { formatDateShort, formatCurrency } from '@/lib/utils'
+import { formatDateShort, formatCurrency } from '@/lib/utils.ts'
 
 interface ItemPedido {
   id: string

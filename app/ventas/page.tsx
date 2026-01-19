@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table'
 import { useAuth } from '@/contexts/AuthContext'
-import { useRestaurante } from '@/contexts/RestauranteContext'
-import { formatCurrency } from '@/lib/utils'
+import { useRestaurante } from '@/contexts/RestauranteContext.tsx'
+import { formatCurrency } from '@/lib/utils.ts'
 
 interface Venta {
   id: string

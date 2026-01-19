@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useRestaurante } from '@/contexts/RestauranteContext'
+import { useRestaurante } from '@/contexts/RestauranteContext.tsx'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 

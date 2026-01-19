@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { RestauranteProvider } from '@/contexts/RestauranteContext'
-import { AuthProvider } from '@/contexts/AuthContext'
+import { RestauranteProvider } from '@/contexts/RestauranteContext.tsx'
+import { AuthProvider } from '@/contexts/AuthContext.tsx'
 import { Sidebar } from '@/components/layout/Sidebar'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })

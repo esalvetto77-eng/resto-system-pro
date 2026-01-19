@@ -1,7 +1,7 @@
 // API Route para generar pedidos automáticos
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { calcularEstadoInventario } from '@/lib/utils'
+import { calcularEstadoInventario } from '@/lib/utils.ts'
 
 // CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
 export const runtime = 'nodejs'
