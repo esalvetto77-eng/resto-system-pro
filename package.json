@@ -16,6 +16,10 @@
     "db:studio": "npx prisma studio",
     "db:seed": "tsx prisma/seed.ts"
   },
+  "dependencies": {
+    "prisma": "5.22.0",
+    "@prisma/client": "5.22.0"
+  },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
   }
