@@ -33,14 +33,12 @@ const nextConfig = {
     const rootPath = path.resolve(__dirname)
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@': rootPath,
+      // Alias específicos para resolver correctamente desde cualquier ubicación
+      '@/components': path.resolve(rootPath, 'components'),
+      '@/contexts': path.resolve(rootPath, 'src/contexts'),
+      '@/lib': path.resolve(rootPath, 'src/lib'),
+      '@': rootPath, // Fallback para otros casos
     }
-    // Agregar módulos para que webpack busque en raíz y src
-    config.resolve.modules = [
-      ...(config.resolve.modules || []),
-      rootPath,
-      path.resolve(rootPath, 'src'),
-    ]
     return config
   },
 }
