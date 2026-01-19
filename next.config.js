@@ -32,7 +32,11 @@ const nextConfig = {
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@': path.resolve(__dirname, 'src'),
+      '@': path.resolve(__dirname),
+      // Mantener compatibilidad: @/ apunta a raíz, pero src/ tiene prioridad
+      '@/components': path.resolve(__dirname, 'components'),
+      '@/contexts': path.resolve(__dirname, 'src/contexts'),
+      '@/lib': path.resolve(__dirname, 'src/lib'),
     }
     return config
   },
