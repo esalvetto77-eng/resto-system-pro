@@ -16,9 +16,7 @@ interface RestauranteContextType {
   loading: boolean
 }
 
-const RestauranteContext = createContext<RestauranteContextType | undefined>(
-  undefined
-)
+const RestauranteContext = createContext<RestauranteContextType | undefined>(undefined)
 
 export function RestauranteProvider({
   children,
@@ -29,15 +27,12 @@ export function RestauranteProvider({
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Cargar restaurantes y restaurante activo desde localStorage
   useEffect(() => {
     async function loadData() {
       try {
-        // Agregar timeout de 5 segundos
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 5000)
         
-        // Cargar restaurantes
         const response = await fetch('/api/restaurantes?activo=true', { signal: controller.signal })
         clearTimeout(timeoutId)
         
@@ -46,31 +41,24 @@ export function RestauranteProvider({
         }
         
         const data = await response.json()
-        // Asegurar que data sea un array
         const restaurantesData = Array.isArray(data) ? data : []
         setRestaurantes(restaurantesData)
 
-        // Cargar restaurante activo desde localStorage
         const storedId = localStorage.getItem('restauranteActivoId')
         if (storedId && restaurantesData.length > 0) {
           const restaurante = restaurantesData.find((r: Restaurante) => r.id === storedId)
           if (restaurante) {
             setRestauranteActivoState(restaurante)
           } else if (restaurantesData.length > 0) {
-            // Si el restaurante guardado no existe, usar el primero
             setRestauranteActivoState(restaurantesData[0])
             localStorage.setItem('restauranteActivoId', restaurantesData[0].id)
           }
         } else if (restaurantesData.length > 0) {
-          // Si no hay restaurante guardado, usar el primero
           setRestauranteActivoState(restaurantesData[0])
           localStorage.setItem('restauranteActivoId', restaurantesData[0].id)
         }
       } catch (error: any) {
         console.error('Error al cargar restaurantes:', error)
-        if (error.name === 'AbortError') {
-          console.error('Timeout: La petición de restaurantes tardó demasiado')
-        }
         setRestaurantes([])
       } finally {
         setLoading(false)

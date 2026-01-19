@@ -1,8 +1,3 @@
-// Utilidades generales
-
-/**
- * Formatea un número como moneda
- */
 export function formatCurrency(value: number | null | undefined): string {
   if (value === null || value === undefined) return '$0'
   return new Intl.NumberFormat('es-AR', {
@@ -13,9 +8,6 @@ export function formatCurrency(value: number | null | undefined): string {
   }).format(value)
 }
 
-/**
- * Formatea una fecha
- */
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return '-'
   const d = typeof date === 'string' ? new Date(date) : date
@@ -26,9 +18,6 @@ export function formatDate(date: Date | string | null | undefined): string {
   }).format(d)
 }
 
-/**
- * Formatea una fecha corta
- */
 export function formatDateShort(date: Date | string | null | undefined): string {
   if (!date) return '-'
   const d = typeof date === 'string' ? new Date(date) : date
@@ -39,9 +28,6 @@ export function formatDateShort(date: Date | string | null | undefined): string 
   }).format(d)
 }
 
-/**
- * Formatea una fecha y hora
- */
 export function formatDateTime(date: Date | string | null | undefined): string {
   if (!date) return '-'
   const d = typeof date === 'string' ? new Date(date) : date
@@ -54,9 +40,6 @@ export function formatDateTime(date: Date | string | null | undefined): string {
   }).format(d)
 }
 
-/**
- * Parsea un JSON de forma segura
- */
 export function parseJSON<T>(json: string | null | undefined, defaultValue: T): T {
   if (!json) return defaultValue
   try {
@@ -66,16 +49,10 @@ export function parseJSON<T>(json: string | null | undefined, defaultValue: T): 
   }
 }
 
-/**
- * Calcula el estado del inventario
- */
 export function calcularEstadoInventario(stockActual: number, stockMinimo: number): 'OK' | 'REPOSICION' {
   return stockActual >= stockMinimo ? 'OK' : 'REPOSICION'
 }
 
-/**
- * Calcula las horas trabajadas diarias a partir de horarios
- */
 export function calcularHorasTrabajadas(entrada: string | null, salida: string | null): string {
   if (!entrada || !salida) return '-'
   
@@ -98,18 +75,12 @@ export function calcularHorasTrabajadas(entrada: string | null, salida: string |
   }
 }
 
-/**
- * Valida si una fecha está vencida
- */
 export function fechaVencida(fecha: Date | string | null | undefined): boolean {
   if (!fecha) return false
   const d = typeof fecha === 'string' ? new Date(fecha) : fecha
   return d < new Date()
 }
 
-/**
- * Valida si una fecha vence pronto (en los próximos 30 días)
- */
 export function fechaVencePronto(fecha: Date | string | null | undefined): boolean {
   if (!fecha) return false
   const d = typeof fecha === 'string' ? new Date(fecha) : fecha
@@ -119,10 +90,6 @@ export function fechaVencePronto(fecha: Date | string | null | undefined): boole
   return d >= hoy && d <= en30Dias
 }
 
-/**
- * Calcula el horario de turno para un día específico basado en los días de descanso
- * Retorna el horario completo, medio turno, o "Libre"
- */
 export function calcularHorarioTurno(
   dia: string,
   diasDescanso: Record<string, string>,
@@ -133,19 +100,16 @@ export function calcularHorarioTurno(
     minutosAfectados: number | null
   } | null
 ): { tipo: 'completo' | 'medio-mañana' | 'medio-tarde' | 'libre' | 'falta' | 'ajustado'; horario?: string; tieneAjuste?: boolean } {
-  // Si hay ajuste de tipo "falta", retornar falta directamente
   if (ajuste && ajuste.tipoAjuste === 'falta') {
     return { tipo: 'falta', tieneAjuste: true }
   }
 
-  // Si no hay horarios configurados, no hay turno
   if (!horarioEntrada || !horarioSalida) {
     return { tipo: 'libre' }
   }
 
   const tipoDescanso = diasDescanso[dia]
   
-  // Calcular horario base según descanso
   let horarioBase: { entrada: number; salida: number } = { entrada: 0, salida: 0 }
   
   try {
@@ -155,63 +119,48 @@ export function calcularHorarioTurno(
     const minutosEntrada = hEntrada * 60 + mEntrada
     const minutosSalida = hSalida * 60 + mSalida
     
-    // Si no hay descanso configurado, turno completo
     if (!tipoDescanso) {
       horarioBase = { entrada: minutosEntrada, salida: minutosSalida }
     } else if (tipoDescanso === 'completo') {
-      // Día libre completo
       return { tipo: 'libre' }
     } else {
-      // Medio día
       const minutosTotales = minutosSalida - minutosEntrada
       const minutosMedio = Math.floor(minutosTotales / 2)
       
       if (tipoDescanso === 'medio-mañana') {
-        // Libre por la mañana: trabajar desde el medio día hasta el final
         horarioBase = { entrada: minutosEntrada + minutosMedio, salida: minutosSalida }
       } else if (tipoDescanso === 'medio-tarde') {
-        // Libre por la tarde: trabajar desde el inicio hasta el medio día
         horarioBase = { entrada: minutosEntrada, salida: minutosEntrada + minutosMedio }
       } else {
         horarioBase = { entrada: minutosEntrada, salida: minutosSalida }
       }
     }
   } catch {
-    // Si hay error, retornar turno completo como fallback
     return { tipo: 'completo', horario: `${horarioEntrada} – ${horarioSalida}` }
   }
 
-  // Aplicar ajustes si existen
   if (ajuste && ajuste.tipoAjuste && ajuste.tipoAjuste !== 'falta') {
     let entradaAjustada = horarioBase.entrada
     let salidaAjustada = horarioBase.salida
 
     switch (ajuste.tipoAjuste) {
       case 'horas_extra':
-        // Extender horario de salida
         if (ajuste.minutosAfectados) {
           salidaAjustada += ajuste.minutosAfectados
         }
         break
       case 'llegada_tarde':
-        // Retrasar horario de entrada
         if (ajuste.minutosAfectados) {
           entradaAjustada += ajuste.minutosAfectados
         }
         break
       case 'salida_anticipada':
-        // Adelantar horario de salida
         if (ajuste.minutosAfectados) {
-          salidaAjustada += ajuste.minutosAfectados // minutosAfectados será negativo
+          salidaAjustada += ajuste.minutosAfectados
         }
-        break
-      case 'cambio_turno':
-        // Para cambio de turno, se requiere horario personalizado (se manejará en el frontend)
-        // Por ahora, retornar horario base
         break
     }
 
-    // Convertir minutos a formato HH:MM
     const hEntradaFinal = Math.floor(entradaAjustada / 60) % 24
     const mEntradaFinal = entradaAjustada % 60
     const hSalidaFinal = Math.floor(salidaAjustada / 60) % 24
@@ -227,7 +176,6 @@ export function calcularHorarioTurno(
     }
   }
 
-  // Sin ajustes, retornar horario base
   const hEntradaBase = Math.floor(horarioBase.entrada / 60) % 24
   const mEntradaBase = horarioBase.entrada % 60
   const hSalidaBase = Math.floor(horarioBase.salida / 60) % 24
