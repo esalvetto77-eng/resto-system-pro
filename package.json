@@ -17,6 +17,9 @@
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "next": "14.0.4",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
     "prisma": "5.22.0",
     "@prisma/client": "5.22.0"
   },
