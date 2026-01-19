@@ -1,6 +1,6 @@
 'use client'
 
-import { useRestaurante } from '@/contexts/RestauranteContext.tsx'
+import { useRestaurante } from '@/contexts/RestauranteContext'
 
 export function RestauranteSelector() {
   const { restauranteActivo, setRestauranteActivo, restaurantes, loading } =
