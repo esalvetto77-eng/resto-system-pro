@@ -2,6 +2,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+// CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 // PUT: Actualizar items de un pedido
 export async function PUT(
   request: NextRequest,

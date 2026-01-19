@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { AdminOnly } from '@/components/guards/AdminOnly'
 
 export default function NuevoRestaurantePage() {
   const router = useRouter()
@@ -54,7 +55,8 @@ export default function NuevoRestaurantePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <AdminOnly>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-neutral-900">
@@ -128,6 +130,7 @@ export default function NuevoRestaurantePage() {
           </div>
         </div>
       </form>
-    </div>
+      </div>
+    </AdminOnly>
   )
 }

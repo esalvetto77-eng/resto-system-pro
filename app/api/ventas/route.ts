@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser, isAdmin } from '@/lib/auth'
 
+// CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 // POST: Crear una venta (todos los roles pueden crear)
 export async function POST(request: NextRequest) {
   try {

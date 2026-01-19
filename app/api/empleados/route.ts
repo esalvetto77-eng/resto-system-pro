@@ -1,11 +1,23 @@
 // API Route para Empleados - Versión simplificada
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { getCurrentUser, isAdmin } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
-const prisma = new PrismaClient()
+// CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
-// GET: Listar todos los empleados
+// GET: Listar todos los empleados (solo ADMIN)
 export async function GET() {
+  const user = await getCurrentUser()
+  
+  // Solo ADMIN puede ver empleados
+  if (!isAdmin(user)) {
+    return NextResponse.json(
+      { error: 'No autorizado. Solo administradores pueden ver empleados.' },
+      { status: 403 }
+    )
+  }
   try {
     const empleados = await prisma.empleado.findMany({
       where: { activo: true },

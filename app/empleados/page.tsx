@@ -10,6 +10,7 @@ import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/Table'
+import { AdminOnly } from '@/components/guards/AdminOnly'
 
 interface Empleado {
   id: string
@@ -133,7 +134,8 @@ export default function EmpleadosPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <AdminOnly>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -286,6 +288,7 @@ export default function EmpleadosPage() {
           </CardBody>
         </Card>
       )}
-    </div>
+      </div>
+    </AdminOnly>
   )
 }

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useRestaurante } from '@/contexts/RestauranteContext'
+import { AdminOnly } from '@/components/guards/AdminOnly'
 
 interface Empleado {
   id: string
@@ -101,7 +102,8 @@ export default function NuevaLiquidacionProfesionalPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <AdminOnly>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-[#111111]" style={{ fontWeight: 600, lineHeight: 1.5, letterSpacing: '-0.01em' }}>
@@ -238,6 +240,7 @@ export default function NuevaLiquidacionProfesionalPage() {
           </form>
         </div>
       </div>
-    </div>
+      </div>
+    </AdminOnly>
   )
 }

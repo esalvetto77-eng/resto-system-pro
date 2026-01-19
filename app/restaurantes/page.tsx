@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { AdminOnly } from '@/components/guards/AdminOnly'
 
 interface Restaurante {
   id: string
@@ -40,7 +41,8 @@ export default function RestaurantesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <AdminOnly>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-neutral-900">Restaurantes</h1>
@@ -119,6 +121,7 @@ export default function RestaurantesPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </AdminOnly>
   )
 }

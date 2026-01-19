@@ -1,11 +1,23 @@
 // API Route para Eventos Mensuales
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getCurrentUser, isAdmin } from '@/lib/auth'
 
+// CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// GET: Listar eventos mensuales
+// GET: Listar eventos mensuales (solo ADMIN)
 export async function GET(request: NextRequest) {
+  const user = await getCurrentUser()
+  
+  // Solo ADMIN puede ver eventos mensuales
+  if (!isAdmin(user)) {
+    return NextResponse.json(
+      { error: 'No autorizado. Solo administradores pueden ver eventos mensuales.' },
+      { status: 403 }
+    )
+  }
   try {
     const searchParams = request.nextUrl.searchParams
     const empleadoId = searchParams.get('empleadoId')
@@ -66,8 +78,17 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: Crear un nuevo evento mensual
+// POST: Crear un nuevo evento mensual (solo ADMIN)
 export async function POST(request: NextRequest) {
+  const user = await getCurrentUser()
+  
+  // Solo ADMIN puede crear eventos mensuales
+  if (!isAdmin(user)) {
+    return NextResponse.json(
+      { error: 'No autorizado. Solo administradores pueden crear eventos mensuales.' },
+      { status: 403 }
+    )
+  }
   try {
     const body = await request.json()
 

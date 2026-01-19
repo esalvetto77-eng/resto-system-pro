@@ -1,8 +1,10 @@
 // API Route para operaciones individuales de Inventario - Versión simplificada
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 
-const prisma = new PrismaClient()
+// CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 // GET: Obtener inventario por ID de producto
 export async function GET(

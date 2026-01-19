@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser, isAdmin } from '@/lib/auth'
 
+// CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 // GET: Obtener estadísticas de ventas
 export async function GET(request: NextRequest) {
   try {

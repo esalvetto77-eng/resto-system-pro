@@ -1,11 +1,23 @@
 // API Route para Restaurantes - Versión ultra simplificada
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { getCurrentUser, isAdmin } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
-const prisma = new PrismaClient()
+// CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
-// GET: Listar todos los restaurantes
+// GET: Listar todos los restaurantes (solo ADMIN puede ver/editar)
 export async function GET() {
+  const user = await getCurrentUser()
+  
+  // Solo ADMIN puede ver restaurantes
+  if (!isAdmin(user)) {
+    return NextResponse.json(
+      { error: 'No autorizado. Solo administradores pueden ver restaurantes.' },
+      { status: 403 }
+    )
+  }
   try {
     const restaurantes = await prisma.restaurante.findMany({
       where: { activo: true },

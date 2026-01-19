@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { parseJSON } from '@/lib/utils'
 import { calcularHorasPeriodo, calcularSueldo } from '@/lib/calculoHoras'
 
+// CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 // GET: Listar cálculos de horas

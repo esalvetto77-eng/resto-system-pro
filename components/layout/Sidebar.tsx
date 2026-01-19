@@ -19,7 +19,9 @@ const navigation = [
   { name: 'Recetas', href: '/recetas', icon: BookOpen, adminOnly: false },
   { name: 'Inventario', href: '/inventario', icon: Warehouse, adminOnly: false },
   { name: 'Pedidos', href: '/pedidos', icon: ShoppingCart, adminOnly: false },
-  { name: 'Ventas', href: '/ventas', icon: DollarSign, adminOnly: false },
+  // Ventas: ADMIN ve listado, ENCARGADO solo puede crear venta
+  { name: 'Ventas', href: '/ventas', icon: DollarSign, adminOnly: true },
+  { name: 'Nueva Venta', href: '/ventas/nuevo', icon: DollarSign, adminOnly: false, encargadoOnly: true },
 ]
 
 export function Sidebar() {
@@ -65,7 +67,15 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-6 py-6 space-y-2 overflow-y-auto">
         {navigation
-          .filter((item) => isAdmin() || !item.adminOnly)
+          .filter((item) => {
+            const itemEncargadoOnly = (item as any).encargadoOnly === true
+            // Si es admin, mostrar todo excepto items solo para encargado
+            if (isAdmin()) {
+              return !itemEncargadoOnly
+            }
+            // Si es encargado, mostrar items no adminOnly O items solo para encargado
+            return !item.adminOnly || itemEncargadoOnly
+          })
           .map((item) => {
             const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
             const IconComponent = item.icon

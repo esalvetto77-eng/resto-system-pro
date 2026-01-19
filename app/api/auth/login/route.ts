@@ -4,6 +4,11 @@ import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { verifyPassword } from '@/lib/auth'
 
+// CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
+// Prisma no funciona en Edge runtime
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic' // No cachear
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -46,21 +51,54 @@ export async function POST(request: NextRequest) {
     }
 
     // Establecer cookie de sesión
+    // IMPORTANTE: Solo guardamos userId, NO el rol
+    // El rol se obtiene de la DB en cada request para garantizar consistencia
+    
+    // Detectar si estamos en Vercel (producción)
+    // Vercel usa HTTPS automáticamente, así que secure debe ser true
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1'
+    const isVercel = process.env.VERCEL === '1'
+    
     const cookieStore = await cookies()
     cookieStore.set('userId', usuario.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      httpOnly: true, // No accesible desde JavaScript (seguridad)
+      secure: isProduction, // true en producción/Vercel (HTTPS requerido)
+      sameSite: 'lax', // Compatible con navegación desde otros sitios
       maxAge: 60 * 60 * 24 * 7, // 7 días
+      path: '/', // Disponible en toda la aplicación
+      // No especificamos 'domain' - Vercel maneja esto automáticamente
+    })
+
+    // LOG: Login exitoso
+    console.log('[AUTH] Login exitoso:', {
+      userId: usuario.id,
+      email: usuario.email,
+      rol: usuario.rol,
+      fuenteRol: 'Base de Datos (Prisma)',
+      cookie: 'userId guardado en cookie (httpOnly)',
+      ambiente: isVercel ? 'Vercel (Producción)' : isProduction ? 'Producción' : 'Desarrollo',
+      cookieConfig: {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: 'lax',
+        path: '/',
+      },
+      nota: 'El rol NO se guarda en cookie, se consulta de DB en cada request',
     })
 
     // Retornar usuario (sin contraseña)
-    return NextResponse.json({
+    // El frontend guardará este rol en estado React
+    const response = NextResponse.json({
       id: usuario.id,
       nombre: usuario.nombre,
       email: usuario.email,
-      rol: usuario.rol,
+      rol: usuario.rol, // Rol desde DB
     })
+    
+    // Headers para evitar caché
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+    
+    return response
   } catch (error) {
     console.error('Error en login:', error)
     return NextResponse.json(

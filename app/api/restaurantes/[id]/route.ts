@@ -1,14 +1,27 @@
 // API Route para operaciones individuales de Restaurantes
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { getCurrentUser, isAdmin } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
-const prisma = new PrismaClient()
+// CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
-// GET: Obtener un restaurante por ID
+// GET: Obtener un restaurante por ID (solo ADMIN)
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const user = await getCurrentUser()
+  
+  // Solo ADMIN puede ver restaurantes
+  if (!isAdmin(user)) {
+    return NextResponse.json(
+      { error: 'No autorizado. Solo administradores pueden ver restaurantes.' },
+      { status: 403 }
+    )
+  }
+
   try {
     const restaurante = await prisma.restaurante.findUnique({
       where: { id: params.id },
@@ -44,11 +57,21 @@ export async function GET(
   }
 }
 
-// PUT: Actualizar un restaurante
+// PUT: Actualizar un restaurante (solo ADMIN)
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const user = await getCurrentUser()
+  
+  // Solo ADMIN puede editar restaurantes
+  if (!isAdmin(user)) {
+    return NextResponse.json(
+      { error: 'No autorizado. Solo administradores pueden editar restaurantes.' },
+      { status: 403 }
+    )
+  }
+
   try {
     const body = await request.json()
 
@@ -98,11 +121,21 @@ export async function PUT(
   }
 }
 
-// DELETE: Eliminar un restaurante (soft delete)
+// DELETE: Eliminar un restaurante (soft delete) - solo ADMIN
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const user = await getCurrentUser()
+  
+  // Solo ADMIN puede eliminar restaurantes
+  if (!isAdmin(user)) {
+    return NextResponse.json(
+      { error: 'No autorizado. Solo administradores pueden eliminar restaurantes.' },
+      { status: 403 }
+    )
+  }
+
   try {
     const restaurante = await prisma.restaurante.update({
       where: { id: params.id },

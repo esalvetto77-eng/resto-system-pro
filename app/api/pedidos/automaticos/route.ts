@@ -1,9 +1,11 @@
 // API Route para generar pedidos automáticos
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import { calcularEstadoInventario } from '@/lib/utils'
 
-const prisma = new PrismaClient()
+// CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 // GET: Generar lista de productos en reposición agrupados por proveedor
 export async function GET() {

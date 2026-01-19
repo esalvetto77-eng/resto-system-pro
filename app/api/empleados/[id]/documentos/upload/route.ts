@@ -4,6 +4,10 @@ import { writeFile } from 'fs/promises'
 import { join } from 'path'
 import { prisma } from '@/lib/prisma'
 
+// CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }

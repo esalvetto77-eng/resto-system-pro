@@ -23,10 +23,16 @@ export async function getCurrentUser(): Promise<UsuarioSession | null> {
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
 
+    // LOG: Validación de cookie
     if (!userId) {
+      console.log('[AUTH] getCurrentUser: No hay userId en cookie - Usuario no autenticado')
       return null
     }
 
+    console.log('[AUTH] getCurrentUser: userId desde cookie:', userId)
+
+    // FUENTE DE VERDAD: Base de Datos
+    // El rol se obtiene directamente de la DB en cada request
     const usuario = await prisma.usuario.findUnique({
       where: { id: userId },
       select: {
@@ -38,13 +44,27 @@ export async function getCurrentUser(): Promise<UsuarioSession | null> {
       },
     })
 
-    if (!usuario || !usuario.activo) {
+    if (!usuario) {
+      console.log('[AUTH] getCurrentUser: Usuario no encontrado en DB para userId:', userId)
       return null
     }
 
+    if (!usuario.activo) {
+      console.log('[AUTH] getCurrentUser: Usuario inactivo:', usuario.email)
+      return null
+    }
+
+    // LOG: Rol obtenido desde DB
+    console.log('[AUTH] getCurrentUser: Usuario encontrado -', {
+      id: usuario.id,
+      email: usuario.email,
+      rol: usuario.rol,
+      fuente: 'Base de Datos (Prisma)',
+    })
+
     return usuario as UsuarioSession
   } catch (error) {
-    console.error('Error al obtener usuario:', error)
+    console.error('[AUTH] getCurrentUser: Error al obtener usuario:', error)
     return null
   }
 }

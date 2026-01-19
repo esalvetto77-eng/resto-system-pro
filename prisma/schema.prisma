@@ -472,3 +472,8 @@ model Venta {
   @@index([fecha, tipoTurno])
   @@map("ventas")
 }
+model Test {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+}

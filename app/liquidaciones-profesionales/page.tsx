@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRestaurante } from '@/contexts/RestauranteContext'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
+import { AdminOnly } from '@/components/guards/AdminOnly'
 
 interface LiquidacionProfesional {
   id: string
@@ -78,7 +79,8 @@ export default function LiquidacionesProfesionalesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <AdminOnly>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-[#111111]" style={{ fontWeight: 600, lineHeight: 1.5, letterSpacing: '-0.01em' }}>
@@ -227,6 +229,7 @@ export default function LiquidacionesProfesionalesPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </AdminOnly>
   )
 }

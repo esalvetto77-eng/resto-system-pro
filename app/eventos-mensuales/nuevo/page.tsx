@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useRestaurante } from '@/contexts/RestauranteContext'
+import { AdminOnly } from '@/components/guards/AdminOnly'
 
 const TIPOS_EVENTO = [
   { value: 'HORAS_EXTRA', label: 'Horas Extra' },
@@ -302,6 +303,7 @@ export default function NuevoEventoMensualPage() {
           </form>
         </div>
       </div>
-    </div>
+      </div>
+    </AdminOnly>
   )
 }

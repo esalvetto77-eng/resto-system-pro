@@ -48,15 +48,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('/api/auth/me')
+      console.log('[FRONTEND] AuthContext.checkAuth: Verificando autenticación...')
+      // CRÍTICO: No cachear request de autenticación
+      // Cada verificación debe consultar DB para obtener rol actual
+      const response = await fetch('/api/auth/me', {
+        cache: 'no-store', // No cachear en navegador
+        credentials: 'include', // Incluir cookies
+      })
       if (response.ok) {
         const userData = await response.json()
+        
+        // LOG: Datos recibidos del backend
+        console.log('[FRONTEND] AuthContext.checkAuth: Usuario recibido del backend:', {
+          id: userData.id,
+          email: userData.email,
+          rol: userData.rol,
+          fuente: 'Fetch a /api/auth/me -> getCurrentUser -> DB',
+          timestamp: new Date().toISOString(),
+        })
+        
         setUser(userData)
+        
+        // Validación: Verificar que el rol sea válido
+        if (userData.rol && !['ADMIN', 'ENCARGADO'].includes(userData.rol)) {
+          console.warn('[FRONTEND] AuthContext.checkAuth: ⚠️ ROL INVÁLIDO:', userData.rol)
+        } else {
+          console.log('[FRONTEND] AuthContext.checkAuth: ✅ Rol válido:', userData.rol)
+        }
       } else {
+        console.log('[FRONTEND] AuthContext.checkAuth: No autenticado (status:', response.status, ')')
         setUser(null)
       }
     } catch (error) {
-      console.error('Error al verificar autenticación:', error)
+      console.error('[FRONTEND] AuthContext.checkAuth: Error al verificar autenticación:', error)
       setUser(null)
     } finally {
       setLoading(false)
@@ -96,7 +120,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const isAdmin = () => user?.rol === 'ADMIN'
+  const isAdmin = () => {
+    const result = user?.rol === 'ADMIN'
+    // Nota: Solo loguear en AdminOnly para evitar spam
+    return result
+  }
+  
   const isEncargado = () => user?.rol === 'ENCARGADO'
   const isDueño = () => isAdmin() // Dueño = ADMIN
   const canEdit = () => isAdmin() // Solo admin puede editar

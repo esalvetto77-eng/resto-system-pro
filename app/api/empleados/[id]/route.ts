@@ -1,9 +1,11 @@
 // API Route para operaciones individuales de Empleados - Versión simplificada
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 
-const prisma = new PrismaClient()
+// CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 // GET: Obtener un empleado por ID
 export async function GET(

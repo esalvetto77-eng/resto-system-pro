@@ -109,7 +109,7 @@ export default function NuevaVentaPage() {
             Registrar una nueva venta
           </p>
         </div>
-        <Link href="/ventas">
+        <Link href="/">
           <Button variant="ghost">Cancelar</Button>
         </Link>
       </div>
@@ -206,7 +206,7 @@ export default function NuevaVentaPage() {
               </div>
 
               <div className="flex justify-end space-x-4 pt-4 border-t border-neutral-200">
-                <Link href="/ventas">
+                <Link href="/">
                   <Button type="button" variant="ghost">
                     Cancelar
                   </Button>

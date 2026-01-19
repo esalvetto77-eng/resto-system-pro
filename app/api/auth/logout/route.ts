@@ -2,6 +2,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
+// CRÍTICO: Usar Node.js runtime para cookies (no Edge)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies()
