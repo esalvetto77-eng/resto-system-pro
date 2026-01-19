@@ -30,14 +30,17 @@ const nextConfig = {
 
   // Configurar webpack para resolver alias @/* correctamente en Vercel
   webpack: (config) => {
+    const rootPath = path.resolve(__dirname)
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@': path.resolve(__dirname),
-      // Mantener compatibilidad: @/ apunta a raíz, pero src/ tiene prioridad
-      '@/components': path.resolve(__dirname, 'components'),
-      '@/contexts': path.resolve(__dirname, 'src/contexts'),
-      '@/lib': path.resolve(__dirname, 'src/lib'),
+      '@': rootPath,
     }
+    // Agregar módulos para que webpack busque en raíz y src
+    config.resolve.modules = [
+      ...(config.resolve.modules || []),
+      rootPath,
+      path.resolve(rootPath, 'src'),
+    ]
     return config
   },
 }
