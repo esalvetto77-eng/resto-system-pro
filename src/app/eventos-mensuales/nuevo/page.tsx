@@ -125,7 +125,8 @@ export default function NuevoEventoMensualPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <AdminOnly>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-[#111111]" style={{ fontWeight: 600, lineHeight: 1.5, letterSpacing: '-0.01em' }}>Nuevo Evento Mensual</h1>
@@ -303,7 +304,6 @@ export default function NuevoEventoMensualPage() {
           </form>
         </div>
       </div>
-      </div>
-    </AdminOnly>
+      </AdminOnly>
   )
 }
