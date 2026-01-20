@@ -107,7 +107,14 @@ export default function RecetasPage() {
 
   // Calcular costos para cada receta
   const recetasConCosto = recetas.map((receta) => {
-    const costo = calcularCostoReceta(receta.ingredientes, receta.porciones)
+    // Convertir ingredientes al formato esperado por calcularCostoReceta
+    const ingredientesConPrecio = receta.ingredientes.map(ing => ({
+      productoId: ing.producto.id,
+      producto: ing.producto,
+      cantidad: ing.cantidad,
+      notas: ing.notas || null,
+    }))
+    const costo = calcularCostoReceta(ingredientesConPrecio, receta.porciones)
     return {
       ...receta,
       costo,
