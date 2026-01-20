@@ -120,8 +120,8 @@ export default function VentasPage() {
         })
       })
 
-      if (!response || !('ok' in response) || !response.ok) {
-        if (response && 'status' in response && response.status === 403) {
+      if (!response || !(response instanceof Response) || !response.ok) {
+        if (response instanceof Response && response.status === 403) {
           router.push('/ventas/nuevo')
           setLoading(false)
           return
