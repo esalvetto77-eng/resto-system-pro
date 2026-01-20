@@ -32,7 +32,7 @@ export const proveedorSchema = z.object({
   minimoCompra: stringToNumber,
   metodoPago: emptyStringToNull,
   diasPedido: z.string().optional().default(JSON.stringify([])), // JSON string
-  horarioPedido: emptyStringToNull.max(50),
+  horarioPedido: z.preprocess((val) => (val === '' ? null : val), z.string().max(50).nullable().optional()),
   diasEntrega: z.string().optional().default(JSON.stringify([])), // JSON string
   activo: z.boolean().optional().default(true),
 })
