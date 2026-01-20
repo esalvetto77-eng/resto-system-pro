@@ -229,7 +229,7 @@ export default function RecetaDetailPageClient({ id }: { id: string }) {
                             </span>
                             {costoIng?.proveedor && (
                               <Badge variant="neutral" className="text-xs">
-                                {costoIng.proveedor.nombre}
+                                {costoIng?.proveedor?.nombre}
                               </Badge>
                             )}
                           </div>
