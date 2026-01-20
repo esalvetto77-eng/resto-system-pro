@@ -37,8 +37,12 @@ const nextConfig = {
       '@/components': path.resolve(rootPath, 'components'),
       '@/contexts': path.resolve(rootPath, 'src/contexts'),
       '@/lib': path.resolve(rootPath, 'src/lib'),
+      // Alias específico para guards
+      '@/components/guards': path.resolve(rootPath, 'components/guards'),
       '@': rootPath, // Fallback para otros casos
     }
+    // Asegurar que webpack pueda resolver extensiones .tsx
+    config.resolve.extensions = [...(config.resolve.extensions || []), '.ts', '.tsx', '.js', '.jsx']
     return config
   },
 }
