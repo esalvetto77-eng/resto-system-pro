@@ -128,7 +128,7 @@ export default function NuevoEventoMensualPage() {
     <AdminOnly>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-        <div>
+          <div>
           <h1 className="text-3xl font-semibold text-[#111111]" style={{ fontWeight: 600, lineHeight: 1.5, letterSpacing: '-0.01em' }}>Nuevo Evento Mensual</h1>
           <p className="text-neutral-600 mt-1">
             Registra un evento que afecta la liquidación del mes
