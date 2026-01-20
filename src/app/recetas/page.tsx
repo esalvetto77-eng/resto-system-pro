@@ -112,7 +112,7 @@ export default function RecetasPage() {
       productoId: ing.producto.id,
       producto: ing.producto,
       cantidad: ing.cantidad,
-      notas: ing.notas || null,
+      notas: (ing as any).notas || null,
     }))
     const costo = calcularCostoReceta(ingredientesConPrecio, receta.porciones)
     return {
