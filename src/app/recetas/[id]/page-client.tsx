@@ -238,7 +238,7 @@ export default function RecetaDetailPageClient({ id }: { id: string }) {
                             {canSeePrices() && costoIng?.precioUnitario && (
                               <span className="ml-2 text-neutral-500">
                                 @ <ProtectedPrice
-                                  value={costoIng.precioUnitario}
+                                  value={costoIng?.precioUnitario}
                                   formatter={formatCurrency}
                                   fallback={<span>-</span>}
                                 />
@@ -253,7 +253,7 @@ export default function RecetaDetailPageClient({ id }: { id: string }) {
                         </div>
                         {canSeePrices() && (
                           <div className="text-right">
-                            {costoIng?.costoTotal !== null ? (
+                            {costoIng && costoIng.costoTotal !== null ? (
                               <ProtectedPrice
                                 value={costoIng.costoTotal}
                                 formatter={formatCurrency}
