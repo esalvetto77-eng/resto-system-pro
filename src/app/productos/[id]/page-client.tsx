@@ -34,7 +34,7 @@ interface ProductoDetailClientProps {
     inventario: {
       id: string
       stockActual: number
-      ultimaActualizacion: string
+      ultimaActualizacion: Date
     } | null
   }
 }
