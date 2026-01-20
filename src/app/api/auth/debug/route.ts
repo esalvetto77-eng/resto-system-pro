@@ -10,6 +10,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  // Permitir acceso sin autenticación para diagnóstico
   try {
     const cookieStore = await cookies()
     const userIdFromCookie = cookieStore.get('userId')?.value
@@ -30,6 +31,20 @@ export async function GET(request: NextRequest) {
         },
       })
     }
+
+    // Listar TODOS los usuarios en la base de datos (para diagnóstico)
+    const todosLosUsuarios = await prisma.usuario.findMany({
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        rol: true,
+        activo: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    })
 
     // Detectar ambiente
     const isVercel = process.env.VERCEL === '1'
@@ -87,6 +102,20 @@ export async function GET(request: NextRequest) {
         dondeSeGuarda: 'Frontend: Estado React (actualizado vía /api/auth/me)',
         dondeNOSeGuarda: 'Cookie (solo userId, no rol)',
         ventaja: 'Si el rol cambia en DB, se refleja en el siguiente request',
+      },
+      usuariosEnDB: {
+        total: todosLosUsuarios.length,
+        lista: todosLosUsuarios,
+        usuariosEsperados: {
+          dueno: {
+            email: 'dueno@resto.com',
+            existe: todosLosUsuarios.some(u => u.email === 'dueno@resto.com'),
+          },
+          encargado: {
+            email: 'encargado@resto.com',
+            existe: todosLosUsuarios.some(u => u.email === 'encargado@resto.com'),
+          },
+        },
       },
     }
 

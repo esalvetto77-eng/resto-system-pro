@@ -7,7 +7,7 @@ interface Usuario {
   id: string
   nombre: string
   email: string
-  rol: 'ADMIN' | 'ENCARGADO'
+  rol: 'ADMIN' | 'DUENO' | 'ENCARGADO'
 }
 
 interface AuthContextType {

@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs'
 
 export const ROLES = {
   ADMIN: 'ADMIN',
+  DUENO: 'DUENO', // Dueño es equivalente a ADMIN
   ENCARGADO: 'ENCARGADO',
 } as const
 
@@ -75,9 +76,10 @@ export function hasRole(user: UsuarioSession | null, role: Rol): boolean {
   return user.rol === role
 }
 
-// Verificar si el usuario es admin
+// Verificar si el usuario es admin (ADMIN o DUENO)
 export function isAdmin(user: UsuarioSession | null): boolean {
-  return hasRole(user, ROLES.ADMIN)
+  if (!user) return false
+  return user.rol === ROLES.ADMIN || user.rol === ROLES.DUENO
 }
 
 // Verificar si el usuario es encargado
