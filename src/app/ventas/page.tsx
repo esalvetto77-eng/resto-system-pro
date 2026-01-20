@@ -173,8 +173,8 @@ export default function VentasPage() {
           }, 1000)
         })
       })
-      if (!response || !response.ok) {
-        if (response?.status === 403) {
+      if (!response || !(response instanceof Response) || !response.ok) {
+        if (response instanceof Response && response.status === 403) {
           console.warn('No autorizado para ver estadísticas')
           return
         }
