@@ -213,7 +213,7 @@ export default function RecetaDetailPageClient({ id }: { id: string }) {
               {receta.ingredientes.length > 0 ? (
                 <div className="space-y-3">
                   {receta.ingredientes.map((ing, idx) => {
-                    const costoIng = costo.ingredientes.find((ci) => ci.productoId === ing.productoId)
+                    const costoIng = costo.ingredientes.find((ci) => ci.productoId === ing.producto.id)
                     return (
                       <div
                         key={ing.id}
