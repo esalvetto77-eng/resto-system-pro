@@ -78,12 +78,12 @@ export const empleadoSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').max(200),
   apellido: z.string().min(1, 'El apellido es requerido').max(200),
   dni: z.preprocess((val) => (val === '' ? null : val), z.string().max(20).nullable().optional()),
-  telefono: emptyStringToNull.max(50),
+  telefono: z.preprocess((val) => (val === '' ? null : val), z.string().max(50).nullable().optional()),
   email: z.preprocess(
     (val) => (val === '' ? null : val),
     z.string().email('Email inválido').max(200).nullable().optional().or(z.literal(''))
   ),
-  direccion: emptyStringToNull.max(500),
+  direccion: z.preprocess((val) => (val === '' ? null : val), z.string().max(500).nullable().optional()),
   tipoSueldo: z.enum(['MENSUAL', 'JORNAL', 'POR_HORA'], {
     errorMap: () => ({ message: 'Tipo de sueldo inválido. Debe ser MENSUAL, JORNAL o POR_HORA' }),
   }),
@@ -93,15 +93,15 @@ export const empleadoSchema = z.object({
   fechaIngreso: dateOrNull,
   activo: z.boolean().optional().default(true),
   diasDescanso: z.preprocess((val) => (val === '' || val === null ? null : val), z.string().nullable().optional()),
-  horarioEntrada: emptyStringToNull.max(10),
-  horarioSalida: emptyStringToNull.max(10),
+  horarioEntrada: z.preprocess((val) => (val === '' ? null : val), z.string().max(10).nullable().optional()),
+  horarioSalida: z.preprocess((val) => (val === '' ? null : val), z.string().max(10).nullable().optional()),
   carnetManipulacionEmision: dateOrNull,
   carnetManipulacionVencimiento: dateOrNull,
   carnetSaludEmision: dateOrNull,
   carnetSaludVencimiento: dateOrNull,
-  cuentaBancaria: emptyStringToNull.max(100),
-  nombreBanco: emptyStringToNull.max(200),
-  cargo: emptyStringToNull.max(200),
+  cuentaBancaria: z.preprocess((val) => (val === '' ? null : val), z.string().max(100).nullable().optional()),
+  nombreBanco: z.preprocess((val) => (val === '' ? null : val), z.string().max(200).nullable().optional()),
+  cargo: z.preprocess((val) => (val === '' ? null : val), z.string().max(200).nullable().optional()),
   tipoRemuneracion: z.enum(['MENSUAL', 'JORNAL']).nullable().optional(),
   sueldoBaseMensual: stringToNumber,
   valorJornal: stringToNumber,
@@ -140,7 +140,7 @@ export const empleadoUpdateSchema = empleadoSchema.partial().required({ nombre: 
 // Esquema para Restaurante
 export const restauranteSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').max(200, 'El nombre es muy largo'),
-  ubicacion: emptyStringToNull.max(500),
+  ubicacion: z.preprocess((val) => (val === '' ? null : val), z.string().max(500).nullable().optional()),
   activo: z.boolean().optional().default(true),
 })
 
