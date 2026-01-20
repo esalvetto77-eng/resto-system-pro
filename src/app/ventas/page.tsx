@@ -126,8 +126,8 @@ export default function VentasPage() {
           setLoading(false)
           return
         }
-        const errorData = response ? await response.json().catch(() => ({ error: 'Error desconocido' })) : { error: 'Error de conexión' }
-        console.error('Error al cargar ventas:', response?.status || 'Sin respuesta', errorData)
+        const errorData = response instanceof Response ? await response.json().catch(() => ({ error: 'Error desconocido' })) : { error: 'Error de conexión' }
+        console.error('Error al cargar ventas:', response instanceof Response ? response.status : 'Sin respuesta', errorData)
         setVentas([])
         setLoading(false)
         return
@@ -178,8 +178,8 @@ export default function VentasPage() {
           console.warn('No autorizado para ver estadísticas')
           return
         }
-        const errorData = response ? await response.json().catch(() => ({ error: 'Error desconocido' })) : { error: 'Error de conexión' }
-        console.error('Error al cargar estadísticas:', response?.status || 'Sin respuesta', errorData)
+        const errorData = response instanceof Response ? await response.json().catch(() => ({ error: 'Error desconocido' })) : { error: 'Error de conexión' }
+        console.error('Error al cargar estadísticas:', response instanceof Response ? response.status : 'Sin respuesta', errorData)
         return
       }
       const data = await response.json()
