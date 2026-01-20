@@ -22,6 +22,7 @@ interface DashboardStats {
   ventasNight?: number
   totalDiario?: number
   totalMensual?: number
+  totalMensualSinIva?: number
 }
 
 export default function HomePage() {
