@@ -14,7 +14,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { email, password } = body
 
+    console.log('[AUTH] Login intento:', { email, passwordProvided: !!password })
+
     if (!email || !password) {
+      console.log('[AUTH] Login error: Email o contraseña faltantes')
       return NextResponse.json(
         { error: 'Email y contraseña son requeridos' },
         { status: 400 }
@@ -26,26 +29,32 @@ export async function POST(request: NextRequest) {
       where: { email: email.toLowerCase() },
     })
 
+    console.log('[AUTH] Usuario encontrado:', usuario ? { id: usuario.id, email: usuario.email, rol: usuario.rol, activo: usuario.activo } : 'NO ENCONTRADO')
+
     if (!usuario) {
+      console.log('[AUTH] Login error: Usuario no encontrado para email:', email.toLowerCase())
       return NextResponse.json(
-        { error: 'Credenciales inválidas' },
+        { error: 'Credenciales inválidas. Verifica tu email y contraseña.' },
         { status: 401 }
       )
     }
 
     if (!usuario.activo) {
+      console.log('[AUTH] Login error: Usuario inactivo:', usuario.email)
       return NextResponse.json(
-        { error: 'Usuario inactivo' },
+        { error: 'Usuario inactivo. Contacta al administrador.' },
         { status: 401 }
       )
     }
 
     // Verificar contraseña
     const passwordValid = await verifyPassword(password, usuario.password)
+    console.log('[AUTH] Verificación de contraseña:', passwordValid ? 'VÁLIDA' : 'INVÁLIDA')
 
     if (!passwordValid) {
+      console.log('[AUTH] Login error: Contraseña incorrecta para usuario:', usuario.email)
       return NextResponse.json(
-        { error: 'Credenciales inválidas' },
+        { error: 'Credenciales inválidas. Verifica tu email y contraseña.' },
         { status: 401 }
       )
     }
