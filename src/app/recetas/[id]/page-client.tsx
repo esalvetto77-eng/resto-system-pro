@@ -95,7 +95,14 @@ export default function RecetaDetailPageClient({ id }: { id: string }) {
     )
   }
 
-  const costo = calcularCostoReceta(receta.ingredientes, receta.porciones)
+  // Convertir ingredientes al formato esperado por calcularCostoReceta
+  const ingredientesConPrecio = receta.ingredientes.map(ing => ({
+    productoId: ing.producto.id,
+    producto: ing.producto,
+    cantidad: ing.cantidad,
+    notas: ing.notas || null,
+  }))
+  const costo = calcularCostoReceta(ingredientesConPrecio, receta.porciones)
 
   return (
     <div className="space-y-8">
