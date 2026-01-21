@@ -20,21 +20,22 @@ export function middleware(request: NextRequest) {
     // Para métodos que modifican datos, verificar origen
     if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
       const origin = request.headers.get('origin')
-      const referer = request.headers.get('referer')
       
       // En producción, verificar que el origen sea válido
       const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1'
       
       if (isProduction) {
-        // Permitir requests sin origin/referer solo si vienen de la misma app
-        // Vercel maneja esto automáticamente, pero agregamos validación adicional
-        const host = request.headers.get('host')
-        if (origin && !origin.includes(host || '')) {
-          // Origen sospechoso
-          return NextResponse.json(
-            { error: 'Origen no permitido' },
-            { status: 403 }
-          )
+        // Validación estricta: comparar hostname exacto (evita bypass por substring)
+        if (origin) {
+          try {
+            const originHost = new URL(origin).hostname
+            const requestHost = request.nextUrl.hostname
+            if (originHost !== requestHost) {
+              return NextResponse.json({ error: 'Origen no permitido' }, { status: 403 })
+            }
+          } catch {
+            return NextResponse.json({ error: 'Origen no permitido' }, { status: 403 })
+          }
         }
       }
     }

@@ -2,6 +2,7 @@
 import { cookies } from 'next/headers'
 import { prisma } from './prisma'
 import bcrypt from 'bcryptjs'
+import { getSessionCookieNames, hasSessionSecret, verifySignedUserId } from './session'
 
 export const ROLES = {
   ADMIN: 'ADMIN',
@@ -22,15 +23,24 @@ export interface UsuarioSession {
 export async function getCurrentUser(): Promise<UsuarioSession | null> {
   try {
     const cookieStore = await cookies()
-    const userId = cookieStore.get('userId')?.value
+    const { primary, legacy } = getSessionCookieNames()
+    const cookieValue = cookieStore.get(primary)?.value ?? cookieStore.get(legacy)?.value
+    const { userId, signed } = cookieValue ? verifySignedUserId(cookieValue) : { userId: null, signed: false }
 
     // LOG: Validación de cookie
     if (!userId) {
-      console.log('[AUTH] getCurrentUser: No hay userId en cookie - Usuario no autenticado')
+      console.log('[AUTH] getCurrentUser: No hay sesión válida en cookie - Usuario no autenticado', {
+        hasSecret: hasSessionSecret(),
+        cookiePresent: Boolean(cookieValue),
+        signedCookie: signed,
+      })
       return null
     }
 
-    console.log('[AUTH] getCurrentUser: userId desde cookie:', userId)
+    console.log('[AUTH] getCurrentUser: userId desde cookie:', userId, {
+      signedCookie: signed,
+      hasSecret: hasSessionSecret(),
+    })
 
     // FUENTE DE VERDAD: Base de Datos
     // El rol se obtiene directamente de la DB en cada request

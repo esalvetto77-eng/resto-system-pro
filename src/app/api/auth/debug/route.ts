@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getCurrentUser, isAdmin } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getSessionCookieNames, hasSessionSecret } from '@/lib/session'
 
 // CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
 export const runtime = 'nodejs'
@@ -13,7 +14,9 @@ export async function GET(request: NextRequest) {
   // Permitir acceso sin autenticación para diagnóstico
   try {
     const cookieStore = await cookies()
-    const userIdFromCookie = cookieStore.get('userId')?.value
+    const { primary, legacy } = getSessionCookieNames()
+    const cookieValue = cookieStore.get(primary)?.value ?? cookieStore.get(legacy)?.value
+    const userIdFromCookie = cookieValue || null
 
     // Obtener usuario desde getCurrentUser (método que usan todas las APIs)
     const user = await getCurrentUser()
@@ -61,6 +64,8 @@ export async function GET(request: NextRequest) {
       cookie: {
         userId: userIdFromCookie || 'NO HAY COOKIE',
         nota: 'Solo userId se guarda en cookie, NO el rol',
+        sessionSecretConfigurado: hasSessionSecret(),
+        cookieNames: { primary, legacy },
         config: {
           httpOnly: true,
           secure: isProduction,

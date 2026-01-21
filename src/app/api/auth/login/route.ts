@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { verifyPassword } from '@/lib/auth'
 import { rateLimit, getClientIP } from '@/lib/rate-limit'
 import { isValidEmail, sanitizeString, getGenericError } from '@/lib/security'
+import { getSessionCookieNames, hasSessionSecret, signUserId } from '@/lib/session'
 
 // CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
 // Prisma no funciona en Edge runtime
@@ -92,7 +93,9 @@ export async function POST(request: NextRequest) {
       // No exponer si el usuario existe o no (timing attack protection)
       // Usar el mismo mensaje genérico y simular verificación de contraseña
       // para evitar timing attacks
-      await verifyPassword('dummy', '$2a$10$dummyhashfordummyverification')
+      // Hash válido (bcrypt) para igualar timing sin depender de valores inválidos
+      const DUMMY_BCRYPT_HASH = '$2b$10$uMKeSNgxE1UN4o3ZKN0Bg.eI0qRO4UK7vrElZ1Bx2lMmJBQ9zGaZS'
+      await verifyPassword(String(password ?? ''), DUMMY_BCRYPT_HASH)
       
       return NextResponse.json(
         { error: 'Credenciales inválidas. Verifica tu email y contraseña.' },
@@ -139,7 +142,14 @@ export async function POST(request: NextRequest) {
     const isVercel = process.env.VERCEL === '1'
     
     const cookieStore = await cookies()
-    cookieStore.set('userId', usuario.id, {
+    const { primary, legacy } = getSessionCookieNames()
+    const sessionValue = signUserId(usuario.id)
+
+    // Seguridad extra: si hay SESSION_SECRET, usamos cookie firmada (y forzamos relogin si alguien intenta forjar)
+    // En producción usamos __Host- (más seguro). En dev dejamos legacy.
+    const cookieName = isProduction ? primary : legacy
+
+    cookieStore.set(cookieName, sessionValue, {
       httpOnly: true, // No accesible desde JavaScript (seguridad)
       secure: isProduction, // true en producción/Vercel (HTTPS requerido)
       sameSite: 'lax', // Compatible con navegación desde otros sitios
@@ -147,6 +157,15 @@ export async function POST(request: NextRequest) {
       path: '/', // Disponible en toda la aplicación
       // No especificamos 'domain' - Vercel maneja esto automáticamente
     })
+
+    // Limpieza: borrar cookie legacy si estamos en producción y migramos a __Host-
+    if (isProduction && cookieName === primary) {
+      try {
+        cookieStore.delete(legacy)
+      } catch {
+        // ignore
+      }
+    }
 
     // LOG: Login exitoso (sin información sensible en logs)
     console.log('[AUTH] Login exitoso:', {
@@ -158,6 +177,8 @@ export async function POST(request: NextRequest) {
       fuenteRol: 'Base de Datos (Prisma)',
       cookie: 'userId guardado en cookie (httpOnly)',
       ambiente: isVercel ? 'Vercel (Producción)' : isProduction ? 'Producción' : 'Desarrollo',
+      cookieName,
+      sessionSigned: hasSessionSecret(),
     })
 
     // Retornar usuario (sin contraseña)

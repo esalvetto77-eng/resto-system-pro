@@ -6,6 +6,20 @@ const nextConfig = {
   
   // Headers de seguridad
   async headers() {
+    const cspReportOnly = [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'self'",
+      // Next.js suele necesitar inline/eval (especialmente en dev); lo dejamos en Report-Only para no romper.
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self' https: wss:",
+      "object-src 'none'",
+    ].join('; ')
+
     return [
       {
         source: '/uploads/:path*',
@@ -29,6 +43,14 @@ const nextConfig = {
             value: 'max-age=63072000; includeSubDomains; preload',
           },
           {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin',
+          },
+          {
+            key: 'Cross-Origin-Resource-Policy',
+            value: 'same-origin',
+          },
+          {
             key: 'X-Frame-Options',
             value: 'SAMEORIGIN',
           },
@@ -47,6 +69,15 @@ const nextConfig = {
           {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=()',
+          },
+          {
+            key: 'X-Permitted-Cross-Domain-Policies',
+            value: 'none',
+          },
+          {
+            // CSP en modo Report-Only para máximo compatibilidad sin romper UI
+            key: 'Content-Security-Policy-Report-Only',
+            value: cspReportOnly,
           },
         ],
       },

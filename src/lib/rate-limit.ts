@@ -7,16 +7,7 @@ interface RateLimitStore {
 }
 
 const store = new Map<string, RateLimitStore>()
-
-// Limpiar entradas expiradas cada 5 minutos
-setInterval(() => {
-  const now = Date.now()
-  for (const [key, value] of store.entries()) {
-    if (value.resetTime < now) {
-      store.delete(key)
-    }
-  }
-}, 5 * 60 * 1000)
+// Nota: en serverless evitamos setInterval. Limpieza “lazy” dentro de rateLimit().
 
 export interface RateLimitOptions {
   windowMs: number // Ventana de tiempo en milisegundos
@@ -42,6 +33,7 @@ export function rateLimit(
   const now = Date.now()
   const key = identifier.toLowerCase()
 
+  // Limpieza lazy: si la entrada expiró, se elimina al consultar
   const existing = store.get(key)
 
   if (!existing || existing.resetTime < now) {
