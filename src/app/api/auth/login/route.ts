@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { verifyPassword } from '@/lib/auth'
+import { rateLimit, getClientIP } from '@/lib/rate-limit'
+import { isValidEmail, sanitizeString, getGenericError } from '@/lib/security'
 
 // CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
 // Prisma no funciona en Edge runtime
@@ -11,11 +13,38 @@ export const dynamic = 'force-dynamic' // No cachear
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting: máximo 5 intentos por IP cada 15 minutos
+    const clientIP = getClientIP(request)
+    const rateLimitResult = rateLimit(`login:${clientIP}`, {
+      windowMs: 15 * 60 * 1000, // 15 minutos
+      maxRequests: 5, // 5 intentos
+    })
+
+    if (!rateLimitResult.success) {
+      console.warn('[AUTH] Rate limit excedido para IP:', clientIP)
+      return NextResponse.json(
+        { 
+          error: 'Demasiados intentos de inicio de sesión. Por favor, intenta nuevamente en unos minutos.',
+          retryAfter: Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000),
+        },
+        { 
+          status: 429,
+          headers: {
+            'Retry-After': Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000).toString(),
+            'X-RateLimit-Limit': '5',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': new Date(rateLimitResult.resetTime).toISOString(),
+          },
+        }
+      )
+    }
+
     const body = await request.json()
-    const { email, password } = body
+    let { email, password } = body
 
-    console.log('[AUTH] Login intento:', { email, passwordProvided: !!password })
-
+    // Sanitizar y validar email
+    email = sanitizeString(email)
+    
     if (!email || !password) {
       console.log('[AUTH] Login error: Email o contraseña faltantes')
       return NextResponse.json(
@@ -23,6 +52,26 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Validar formato de email
+    if (!isValidEmail(email)) {
+      console.log('[AUTH] Login error: Email inválido:', email)
+      return NextResponse.json(
+        { error: 'Formato de email inválido' },
+        { status: 400 }
+      )
+    }
+
+    // Validar longitud de contraseña
+    if (password.length < 4 || password.length > 100) {
+      console.log('[AUTH] Login error: Contraseña con longitud inválida')
+      return NextResponse.json(
+        { error: 'Credenciales inválidas' },
+        { status: 400 }
+      )
+    }
+
+    console.log('[AUTH] Login intento:', { email: email.toLowerCase(), passwordProvided: !!password, ip: clientIP })
 
     // Buscar usuario
     const usuario = await prisma.usuario.findUnique({
@@ -32,7 +81,19 @@ export async function POST(request: NextRequest) {
     console.log('[AUTH] Usuario encontrado:', usuario ? { id: usuario.id, email: usuario.email, rol: usuario.rol, activo: usuario.activo } : 'NO ENCONTRADO')
 
     if (!usuario) {
-      console.log('[AUTH] Login error: Usuario no encontrado para email:', email.toLowerCase())
+      // Log de intento fallido (sin exponer información sensible)
+      console.warn('[AUTH] Login fallido:', {
+        email: email.toLowerCase(),
+        ip: clientIP,
+        timestamp: new Date().toISOString(),
+        motivo: 'Usuario no encontrado',
+      })
+      
+      // No exponer si el usuario existe o no (timing attack protection)
+      // Usar el mismo mensaje genérico y simular verificación de contraseña
+      // para evitar timing attacks
+      await verifyPassword('dummy', '$2a$10$dummyhashfordummyverification')
+      
       return NextResponse.json(
         { error: 'Credenciales inválidas. Verifica tu email y contraseña.' },
         { status: 401 }
@@ -52,7 +113,16 @@ export async function POST(request: NextRequest) {
     console.log('[AUTH] Verificación de contraseña:', passwordValid ? 'VÁLIDA' : 'INVÁLIDA')
 
     if (!passwordValid) {
-      console.log('[AUTH] Login error: Contraseña incorrecta para usuario:', usuario.email)
+      // Log de intento fallido (sin exponer información sensible)
+      console.warn('[AUTH] Login fallido:', {
+        email: usuario.email,
+        ip: clientIP,
+        timestamp: new Date().toISOString(),
+        motivo: 'Contraseña incorrecta',
+      })
+      
+      // No exponer si el usuario existe o no (timing attack protection)
+      // Usar el mismo mensaje genérico
       return NextResponse.json(
         { error: 'Credenciales inválidas. Verifica tu email y contraseña.' },
         { status: 401 }
@@ -78,21 +148,16 @@ export async function POST(request: NextRequest) {
       // No especificamos 'domain' - Vercel maneja esto automáticamente
     })
 
-    // LOG: Login exitoso
+    // LOG: Login exitoso (sin información sensible en logs)
     console.log('[AUTH] Login exitoso:', {
       userId: usuario.id,
       email: usuario.email,
       rol: usuario.rol,
+      ip: clientIP,
+      timestamp: new Date().toISOString(),
       fuenteRol: 'Base de Datos (Prisma)',
       cookie: 'userId guardado en cookie (httpOnly)',
       ambiente: isVercel ? 'Vercel (Producción)' : isProduction ? 'Producción' : 'Desarrollo',
-      cookieConfig: {
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: 'lax',
-        path: '/',
-      },
-      nota: 'El rol NO se guarda en cookie, se consulta de DB en cada request',
     })
 
     // Retornar usuario (sin contraseña)
@@ -104,14 +169,27 @@ export async function POST(request: NextRequest) {
       rol: usuario.rol, // Rol desde DB
     })
     
-    // Headers para evitar caché
-    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+    // Headers de seguridad
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    response.headers.set('Pragma', 'no-cache')
+    response.headers.set('Expires', '0')
+    response.headers.set('X-RateLimit-Limit', '5')
+    response.headers.set('X-RateLimit-Remaining', rateLimitResult.remaining.toString())
+    response.headers.set('X-RateLimit-Reset', new Date(rateLimitResult.resetTime).toISOString())
     
     return response
   } catch (error) {
-    console.error('Error en login:', error)
+    // No exponer detalles del error en producción
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1'
+    
+    console.error('[AUTH] Error en login:', {
+      error: error instanceof Error ? error.message : 'Error desconocido',
+      stack: isProduction ? undefined : error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+    })
+    
     return NextResponse.json(
-      { error: 'Error al iniciar sesión' },
+      getGenericError('Error al iniciar sesión. Por favor, intenta nuevamente.'),
       { status: 500 }
     )
   }
