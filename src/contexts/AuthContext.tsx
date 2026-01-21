@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(userData)
         
         // Validación: Verificar que el rol sea válido
-        if (userData.rol && !['ADMIN', 'ENCARGADO'].includes(userData.rol)) {
+        if (userData.rol && !['ADMIN', 'DUENO', 'ENCARGADO'].includes(userData.rol)) {
           console.warn('[FRONTEND] AuthContext.checkAuth: ⚠️ ROL INVÁLIDO:', userData.rol)
         } else {
           console.log('[FRONTEND] AuthContext.checkAuth: ✅ Rol válido:', userData.rol)
@@ -121,7 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const isAdmin = () => {
-    const result = user?.rol === 'ADMIN'
+    // ADMIN y DUENO se consideran administradores en el sistema
+    const result = user?.rol === 'ADMIN' || user?.rol === 'DUENO'
     // Nota: Solo loguear en AdminOnly para evitar spam
     return result
   }
