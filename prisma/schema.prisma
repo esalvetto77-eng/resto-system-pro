@@ -441,19 +441,35 @@ model RecetaIngrediente {
 }
 
 model Usuario {
-  id        String   @id @default(cuid())
-  nombre    String
-  email     String   @unique
-  password  String
-  rol       String   @default("ENCARGADO")
-  activo    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String              @id @default(cuid())
+  nombre            String
+  email             String              @unique
+  password          String
+  rol               String              @default("ENCARGADO")
+  activo            Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  passwordResetTokens PasswordResetToken[]
 
   @@index([email])
   @@index([rol])
   @@index([activo])
   @@map("usuarios")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  token     String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      Usuario  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([expiresAt])
+  @@index([used])
+  @@map("password_reset_tokens")
 }
 
 model Venta {

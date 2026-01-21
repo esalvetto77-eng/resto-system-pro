@@ -83,6 +83,15 @@ export default function LoginPage() {
               >
                 {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
               </Button>
+
+              <div className="text-center">
+                <a
+                  href="/forgot-password"
+                  className="text-sm text-terracotta-600 hover:text-terracotta-700"
+                >
+                  ¿Olvidaste tu contraseña?
+                </a>
+              </div>
             </form>
           </CardBody>
         </Card>
