@@ -131,3 +131,26 @@ export function isEmailConfigured(): boolean {
     (process.env.EMAIL_FROM || process.env.EMAIL_USER)
   )
 }
+
+/**
+ * Obtener lista de emails autorizados para recuperación de contraseña
+ * Solo estos emails pueden solicitar recuperación
+ */
+export function getAllowedRecoveryEmails(): string[] {
+  // Obtener de variable de entorno (separados por comas)
+  const allowedEmailsEnv = process.env.ALLOWED_PASSWORD_RECOVERY_EMAILS || ''
+  
+  if (!allowedEmailsEnv) {
+    // Si no está configurado, retornar array vacío (nadie puede recuperar)
+    console.warn('[EMAIL] ALLOWED_PASSWORD_RECOVERY_EMAILS no configurado - recuperación deshabilitada')
+    return []
+  }
+
+  // Separar por comas, limpiar espacios y convertir a minúsculas
+  const emails = allowedEmailsEnv
+    .split(',')
+    .map(email => email.trim().toLowerCase())
+    .filter(email => email.length > 0)
+
+  return emails
+}

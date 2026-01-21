@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { createPasswordResetToken } from '@/lib/password-reset'
-import { sendPasswordResetEmail, isEmailConfigured } from '@/lib/email'
+import { sendPasswordResetEmail, isEmailConfigured, getAllowedRecoveryEmails } from '@/lib/email'
 import { isValidEmail, sanitizeString } from '@/lib/security'
 import { rateLimit, getClientIP } from '@/lib/rate-limit'
 
@@ -57,6 +57,24 @@ export async function POST(request: NextRequest) {
 
     if (!isValidEmail(email)) {
       // No revelar si el email existe o no (seguridad)
+      return NextResponse.json(
+        { message: 'Si el email existe, recibirás un enlace para restablecer tu contraseña' },
+        { status: 200 }
+      )
+    }
+
+    // VALIDACIÓN CRÍTICA: Solo emails autorizados pueden recuperar contraseña
+    const allowedEmails = getAllowedRecoveryEmails()
+    const emailLower = email.toLowerCase()
+    
+    if (!allowedEmails.includes(emailLower)) {
+      // No revelar que el email no está autorizado (seguridad)
+      console.warn('[AUTH] Intento de recuperación desde email no autorizado:', {
+        email: emailLower,
+        ip: clientIP,
+        timestamp: new Date().toISOString(),
+      })
+      // Retornar el mismo mensaje genérico para no revelar información
       return NextResponse.json(
         { message: 'Si el email existe, recibirás un enlace para restablecer tu contraseña' },
         { status: 200 }
