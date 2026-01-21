@@ -1,7 +1,7 @@
 // API Route para operaciones individuales de Proveedores - Versión simplificada
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUser, isAdmin } from '@/lib/auth'
 
 // CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
 export const runtime = 'nodejs'
@@ -136,9 +136,9 @@ export async function DELETE(
   try {
     // Obtener usuario actual desde la sesión
     const user = await getCurrentUser()
-    const isAdmin = user?.rol === 'ADMIN'
+    const userIsAdmin = isAdmin(user)
 
-    if (isAdmin) {
+    if (userIsAdmin) {
       // Hard delete: Eliminar completamente el proveedor y sus relaciones
       await prisma.$transaction(async (tx) => {
         // Eliminar relaciones primero (por las foreign keys)

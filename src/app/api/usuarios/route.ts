@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (rol !== 'ADMIN' && rol !== 'ENCARGADO') {
+    if (rol !== 'ADMIN' && rol !== 'DUENO' && rol !== 'ENCARGADO') {
       return NextResponse.json(
         { error: 'Rol inválido' },
         { status: 400 }

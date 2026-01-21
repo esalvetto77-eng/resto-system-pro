@@ -1,7 +1,7 @@
 // API Route para estadísticas del Dashboard
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUser, isAdmin } from '@/lib/auth'
 import { calcularEstadoInventario } from '@/lib/utils'
 
 // CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
@@ -15,12 +15,12 @@ export async function GET(request: NextRequest) {
 
     // Obtener usuario actual para verificar permisos
     const user = await getCurrentUser()
-    const isAdmin = user?.rol === 'ADMIN'
+    const userIsAdmin = isAdmin(user)
 
     // Contar empleados activos solo si el usuario es ADMIN
     // Los encargados NO deben ver información de empleados
     let empleadosActivos = 0
-    if (isAdmin) {
+    if (userIsAdmin) {
       const empleadosWhere: any = { activo: true }
       if (restauranteId) {
         empleadosWhere.OR = [
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
       totalMensualSinIva: 0,
     }
 
-    if (isAdmin) {
+    if (userIsAdmin) {
       // Ventas del día (hoy)
       // Obtener la fecha de hoy en formato YYYY-MM-DD para comparar solo la fecha, sin hora
       const now = new Date()
