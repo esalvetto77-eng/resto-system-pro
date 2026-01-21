@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser, isAdmin, hashPassword } from '@/lib/auth'
-import { validateLength, sanitizeString } from '@/lib/security'
+import { validateLength } from '@/lib/security'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -33,11 +33,8 @@ export async function POST(
     }
 
     const body = await request.json()
-    let { nuevaPassword, confirmPassword } = body
-
-    // Sanitizar
-    nuevaPassword = sanitizeString(nuevaPassword)
-    confirmPassword = sanitizeString(confirmPassword)
+    const nuevaPassword = typeof body?.nuevaPassword === 'string' ? body.nuevaPassword : ''
+    const confirmPassword = typeof body?.confirmPassword === 'string' ? body.confirmPassword : ''
 
     // Validar que ambas contraseñas estén presentes
     if (!nuevaPassword || !confirmPassword) {
@@ -55,10 +52,22 @@ export async function POST(
       )
     }
 
-    // Validar longitud mínima
-    if (!validateLength(nuevaPassword, 6, 100)) {
+    // Validación fuerte (recomendado)
+    // - mínimo 12 caracteres
+    // - máximo 200
+    if (!validateLength(nuevaPassword, 12, 200)) {
       return NextResponse.json(
-        { error: 'La contraseña debe tener entre 6 y 100 caracteres' },
+        { error: 'La contraseña debe tener entre 12 y 200 caracteres' },
+        { status: 400 }
+      )
+    }
+
+    // Reglas básicas de complejidad (sin ser excesivo)
+    const hasLetter = /[A-Za-z]/.test(nuevaPassword)
+    const hasNumber = /\d/.test(nuevaPassword)
+    if (!hasLetter || !hasNumber) {
+      return NextResponse.json(
+        { error: 'La contraseña debe incluir al menos una letra y un número' },
         { status: 400 }
       )
     }
