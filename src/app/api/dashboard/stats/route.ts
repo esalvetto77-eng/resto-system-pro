@@ -126,13 +126,9 @@ export async function GET(request: NextRequest) {
       console.log('Restaurante ID filtro:', restauranteId)
       
       // Obtener TODAS las ventas (sin límite para asegurar que obtenemos todas)
-      const whereBase: any = {}
-      if (restauranteId) {
-        whereBase.restauranteId = restauranteId
-      }
-      
+      // Si hay restauranteId, filtrar por él, sino obtener todas
       const todasLasVentas = await prisma.venta.findMany({
-        where: whereBase,
+        where: restauranteId ? { restauranteId } : {},
         select: {
           id: true,
           fecha: true,
@@ -144,6 +140,24 @@ export async function GET(request: NextRequest) {
           fecha: 'desc',
         },
       })
+      
+      // También obtener ventas sin filtro para debug
+      const todasLasVentasSinFiltro = await prisma.venta.findMany({
+        select: {
+          id: true,
+          fecha: true,
+          monto: true,
+          tipoTurno: true,
+          restauranteId: true,
+        },
+        orderBy: {
+          fecha: 'desc',
+        },
+        take: 10,
+      })
+      
+      console.log('Ventas con filtro de restaurante:', todasLasVentas.length)
+      console.log('Total ventas sin filtro (primeras 10):', todasLasVentasSinFiltro.length)
       
       console.log('Total ventas en BD:', todasLasVentas.length)
       
