@@ -263,7 +263,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    const response = {
       empleadosActivos,
       proveedoresActivos,
       productosActivos,
@@ -273,7 +273,13 @@ export async function GET(request: NextRequest) {
       restaurantesActivos,
       ...ventasStats,
       ...pagosPendientesStats,
-    })
+    }
+    
+    console.log('=== RESPUESTA FINAL DEL ENDPOINT ===')
+    console.log('Response completo:', JSON.stringify(response, null, 2))
+    console.log('ventasStats en response:', response.ventasDay, response.ventasNight, response.totalDiario, response.totalMensual, response.totalMensualSinIva)
+    
+    return NextResponse.json(response)
   } catch (error) {
     console.error('Error al obtener estadísticas del dashboard:', error)
     return NextResponse.json(
