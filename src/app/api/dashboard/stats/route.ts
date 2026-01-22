@@ -115,34 +115,24 @@ export async function GET(request: NextRequest) {
 
     if (userIsAdmin) {
       // Ventas del día (hoy)
-      // Obtener la fecha de hoy en formato YYYY-MM-DD para comparar solo la fecha, sin hora
       const now = new Date()
-      
-      // Crear rango de fechas para comparar correctamente
-      // Las ventas se guardan con fecha a mediodía (12:00) en hora local
-      // Usar un rango que cubra todo el día (desde inicio hasta fin)
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
-      const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
-
       const todayYear = now.getFullYear()
       const todayMonth = now.getMonth()
       const todayDay = now.getDate()
 
-      // Obtener todas las ventas del día usando un rango amplio y filtrar por año/mes/día
-      // Esto es más seguro que confiar solo en el rango de horas
-      const whereVentasAmplio: any = {
-        fecha: {
-          gte: new Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0),
-          lt: new Date(todayYear, todayMonth, todayDay + 1, 0, 0, 0, 0), // Hasta el inicio del día siguiente
-        },
-      }
+      console.log('=== DEBUG VENTAS DASHBOARD ===')
+      console.log('Usuario es ADMIN:', userIsAdmin)
+      console.log('Fecha de hoy:', `${todayYear}/${todayMonth + 1}/${todayDay}`)
+      console.log('Restaurante ID filtro:', restauranteId)
+      
+      // Obtener TODAS las ventas (sin límite para asegurar que obtenemos todas)
+      const whereBase: any = {}
       if (restauranteId) {
-        whereVentasAmplio.restauranteId = restauranteId
+        whereBase.restauranteId = restauranteId
       }
       
-      // Obtener TODAS las ventas (sin filtro de fecha primero para debug)
       const todasLasVentas = await prisma.venta.findMany({
-        where: restauranteId ? { restauranteId } : {},
+        where: whereBase,
         select: {
           id: true,
           fecha: true,
@@ -153,23 +143,23 @@ export async function GET(request: NextRequest) {
         orderBy: {
           fecha: 'desc',
         },
-        take: 50, // Obtener más para debug
       })
       
-      console.log('=== DEBUG VENTAS DASHBOARD ===')
       console.log('Total ventas en BD:', todasLasVentas.length)
-      console.log('Fecha de hoy (año/mes/día):', `${todayYear}/${todayMonth + 1}/${todayDay}`)
-      console.log('Últimas ventas en la BD:', todasLasVentas.slice(0, 10).map(v => ({
-        id: v.id,
-        fecha: v.fecha.toISOString(),
-        fechaLocal: v.fecha.toLocaleString('es-AR'),
-        año: v.fecha.getFullYear(),
-        mes: v.fecha.getMonth() + 1,
-        día: v.fecha.getDate(),
-        monto: v.monto,
-        tipoTurno: v.tipoTurno,
-        restauranteId: v.restauranteId,
-      })))
+      
+      if (todasLasVentas.length > 0) {
+        console.log('Últimas 5 ventas en la BD:', todasLasVentas.slice(0, 5).map(v => ({
+          id: v.id,
+          fecha: v.fecha.toISOString(),
+          fechaLocal: v.fecha.toLocaleString('es-AR'),
+          año: v.fecha.getFullYear(),
+          mes: v.fecha.getMonth() + 1,
+          día: v.fecha.getDate(),
+          monto: v.monto,
+          tipoTurno: v.tipoTurno,
+          restauranteId: v.restauranteId,
+        })))
+      }
       
       // Filtrar en memoria las ventas de hoy
       const ventasHoy = todasLasVentas.filter(v => {
@@ -181,12 +171,14 @@ export async function GET(request: NextRequest) {
       })
       
       console.log('Ventas filtradas para hoy:', ventasHoy.length)
-      console.log('Ventas de hoy:', ventasHoy.map(v => ({
-        id: v.id,
-        fecha: v.fecha.toLocaleString('es-AR'),
-        monto: v.monto,
-        tipoTurno: v.tipoTurno,
-      })))
+      if (ventasHoy.length > 0) {
+        console.log('Ventas de hoy:', ventasHoy.map(v => ({
+          id: v.id,
+          fecha: v.fecha.toLocaleString('es-AR'),
+          monto: v.monto,
+          tipoTurno: v.tipoTurno,
+        })))
+      }
 
       // Calcular totales directamente desde las ventas filtradas
       const ventasDay = ventasHoy
