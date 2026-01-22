@@ -215,15 +215,31 @@ export async function GET(request: NextRequest) {
       const añoActual = now.getFullYear()
       
       const ventasDelMes = todasLasVentas.filter(v => {
-        const ventaYear = v.fecha.getFullYear()
-        const ventaMonth = v.fecha.getMonth()
-        return ventaYear === añoActual && ventaMonth === mesActual
+        try {
+          const ventaYear = v.fecha.getFullYear()
+          const ventaMonth = v.fecha.getMonth()
+          return ventaYear === añoActual && ventaMonth === mesActual
+        } catch (e) {
+          console.error('Error al filtrar venta del mes:', e, v)
+          return false
+        }
       })
       
-      const totalMensualConIva = ventasDelMes.reduce((sum, v) => sum + v.monto, 0)
-      const totalMensualSinIva = totalMensualConIva / 1.22
+      const totalMensualConIva = ventasDelMes.length > 0 
+        ? ventasDelMes.reduce((sum, v) => sum + (v.monto || 0), 0)
+        : 0
+      const totalMensualSinIva = totalMensualConIva > 0 
+        ? totalMensualConIva / 1.22 
+        : 0
       
+      console.log('=== CÁLCULO TOTAL MENSUAL ===')
+      console.log('Mes actual:', mesActual + 1, 'Año:', añoActual)
       console.log('Ventas del mes actual:', ventasDelMes.length)
+      console.log('Detalle ventas del mes:', ventasDelMes.map(v => ({
+        fecha: v.fecha.toLocaleString('es-AR'),
+        monto: v.monto,
+        tipoTurno: v.tipoTurno,
+      })))
       console.log('Total mensual con IVA:', totalMensualConIva)
       console.log('Total mensual sin IVA:', totalMensualSinIva)
 
