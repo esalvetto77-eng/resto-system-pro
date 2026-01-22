@@ -210,30 +210,22 @@ export async function GET(request: NextRequest) {
       console.log('- Ventas NIGHT:', ventasNight)
       console.log('- Total Diario:', totalDiario)
 
-      // Total mensual
-      const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1)
-      const finMes = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-      finMes.setHours(23, 59, 59, 999)
-
-      const whereVentasMes: any = {
-        fecha: {
-          gte: inicioMes,
-          lte: finMes,
-        },
-      }
-      if (restauranteId) {
-        whereVentasMes.restauranteId = restauranteId
-      }
-
-      const totalMensual = await prisma.venta.aggregate({
-        where: whereVentasMes,
-        _sum: {
-          monto: true,
-        },
+      // Total mensual - calcular desde todas las ventas filtradas en memoria
+      const mesActual = now.getMonth()
+      const añoActual = now.getFullYear()
+      
+      const ventasDelMes = todasLasVentas.filter(v => {
+        const ventaYear = v.fecha.getFullYear()
+        const ventaMonth = v.fecha.getMonth()
+        return ventaYear === añoActual && ventaMonth === mesActual
       })
-
-      const totalMensualConIva = totalMensual._sum.monto || 0
+      
+      const totalMensualConIva = ventasDelMes.reduce((sum, v) => sum + v.monto, 0)
       const totalMensualSinIva = totalMensualConIva / 1.22
+      
+      console.log('Ventas del mes actual:', ventasDelMes.length)
+      console.log('Total mensual con IVA:', totalMensualConIva)
+      console.log('Total mensual sin IVA:', totalMensualSinIva)
 
       ventasStats = {
         ventasDay: ventasDay,
