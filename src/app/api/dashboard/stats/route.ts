@@ -280,8 +280,11 @@ export async function GET(request: NextRequest) {
     console.log('ventasStats en response:', response.ventasDay, response.ventasNight, response.totalDiario, response.totalMensual, response.totalMensualSinIva)
     
     return NextResponse.json(response)
-  } catch (error) {
-    console.error('Error al obtener estadísticas del dashboard:', error)
+  } catch (error: any) {
+    console.error('=== ERROR AL OBTENER ESTADÍSTICAS DEL DASHBOARD ===')
+    console.error('Error completo:', error)
+    console.error('Mensaje:', error?.message)
+    console.error('Stack:', error?.stack)
     return NextResponse.json(
       {
         empleadosActivos: 0,
@@ -298,6 +301,7 @@ export async function GET(request: NextRequest) {
         totalMensualSinIva: 0,
         totalPendiente: 0,
         cantidadPendientes: 0,
+        error: error?.message || 'Error desconocido',
       },
       { status: 500 }
     )
