@@ -236,10 +236,11 @@ export async function GET(request: NextRequest) {
       }
       
       // Log para depuración
-      console.log('Estadísticas de ventas calculadas:', ventasStats)
-      console.log('Total mensual calculado:', totalMensual._sum.monto)
-      console.log('Fecha inicio mes:', inicioMes.toISOString())
-      console.log('Fecha fin mes:', finMes.toISOString())
+      console.log('=== ESTADÍSTICAS FINALES DE VENTAS ===')
+      console.log('Estadísticas de ventas calculadas:', JSON.stringify(ventasStats, null, 2))
+      console.log('Ventas del día:', ventasHoy.length)
+      console.log('Ventas del mes:', ventasDelMes.length)
+      console.log('Total mensual calculado:', totalMensualConIva)
     }
 
     // Estadísticas de pagos pendientes (solo ADMIN)
