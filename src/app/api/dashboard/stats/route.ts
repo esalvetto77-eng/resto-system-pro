@@ -117,13 +117,78 @@ export async function GET(request: NextRequest) {
       // Ventas del día (hoy)
       // Obtener la fecha de hoy en formato YYYY-MM-DD para comparar solo la fecha, sin hora
       const now = new Date()
+      
+      // Crear rango de fechas para comparar correctamente
+      // Las ventas se guardan con fecha a mediodía (12:00) en hora local
+      // Usar un rango que cubra todo el día (desde inicio hasta fin)
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
       const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
 
-      console.log('Fecha de hoy (inicio):', todayStart.toISOString())
-      console.log('Fecha de hoy (fin):', todayEnd.toISOString())
+      const todayYear = now.getFullYear()
+      const todayMonth = now.getMonth()
+      const todayDay = now.getDate()
 
-      // Obtener todas las ventas del mes para debug
+      // Obtener todas las ventas del día usando un rango amplio y filtrar por año/mes/día
+      // Esto es más seguro que confiar solo en el rango de horas
+      const whereVentasAmplio: any = {
+        fecha: {
+          gte: new Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0),
+          lt: new Date(todayYear, todayMonth, todayDay + 1, 0, 0, 0, 0), // Hasta el inicio del día siguiente
+        },
+      }
+      if (restauranteId) {
+        whereVentasAmplio.restauranteId = restauranteId
+      }
+      
+      // Obtener todas las ventas del día
+      const ventasDelDia = await prisma.venta.findMany({
+        where: whereVentasAmplio,
+        select: {
+          id: true,
+          fecha: true,
+          monto: true,
+          tipoTurno: true,
+        },
+      })
+      
+      // Filtrar en memoria para asegurar que son del día correcto (por si hay problemas de zona horaria)
+      const ventasHoy = ventasDelDia.filter(v => {
+        const ventaYear = v.fecha.getFullYear()
+        const ventaMonth = v.fecha.getMonth()
+        const ventaDay = v.fecha.getDate()
+        return ventaYear === todayYear && ventaMonth === todayMonth && ventaDay === todayDay
+      })
+      
+      console.log('Ventas encontradas en rango:', ventasDelDia.length)
+      console.log('Ventas filtradas para hoy:', ventasHoy.length)
+      
+      // Usar los IDs de las ventas de hoy para las agregaciones
+      const ventasHoyIds = ventasHoy.map(v => v.id)
+      
+      const whereVentas: any = {}
+      if (ventasHoyIds.length > 0) {
+        whereVentas.id = { in: ventasHoyIds }
+      } else {
+        // Si no hay ventas, usar un filtro que no devuelva nada
+        whereVentas.id = { in: [] }
+      }
+      if (restauranteId) {
+        whereVentas.restauranteId = restauranteId
+      }
+
+      // Obtener todas las ventas de hoy para verificar y debug
+      const ventasHoyTest = await prisma.venta.findMany({
+        where: whereVentas,
+        select: {
+          id: true,
+          fecha: true,
+          monto: true,
+          tipoTurno: true,
+        },
+        take: 10,
+      })
+      
+      // También obtener todas las ventas sin filtro de fecha para debug
       const todasLasVentas = await prisma.venta.findMany({
         select: {
           id: true,
@@ -136,45 +201,27 @@ export async function GET(request: NextRequest) {
         },
         take: 20,
       })
-      console.log('Últimas 20 ventas en la BD:', todasLasVentas.map(v => ({
-        fecha: v.fecha.toISOString(),
-        fechaLocal: v.fecha.toLocaleString('es-AR'),
-        monto: v.monto,
-        tipoTurno: v.tipoTurno,
-      })))
-
-      // Crear rango de fechas para comparar correctamente
-      // Usar el mismo método que al guardar: fecha en hora local a mediodía
-      const todayStartForQuery = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
-      const todayEndForQuery = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
-
-      const whereVentas: any = {
-        fecha: {
-          gte: todayStartForQuery,
-          lte: todayEndForQuery,
-        },
-      }
-      if (restauranteId) {
-        whereVentas.restauranteId = restauranteId
-      }
-
-      // Obtener todas las ventas de hoy para verificar
-      const ventasHoyTest = await prisma.venta.findMany({
-        where: whereVentas,
-        select: {
-          id: true,
-          fecha: true,
-          monto: true,
-          tipoTurno: true,
-        },
-        take: 10,
-      })
-      console.log('Fecha de inicio (todayStart):', todayStart.toISOString())
-      console.log('Fecha de fin (todayEnd):', todayEnd.toISOString())
+      
+      console.log('=== DEBUG VENTAS DASHBOARD ===')
+      console.log('Fecha de hoy (inicio):', todayStart.toISOString())
+      console.log('Fecha de hoy (fin):', todayEnd.toISOString())
+      console.log('Fecha de hoy (año/mes/día):', `${todayYear}/${todayMonth + 1}/${todayDay}`)
       console.log('Ventas encontradas para hoy (primeras 10):', ventasHoyTest.map(v => ({
         id: v.id,
         fecha: v.fecha.toISOString(),
         fechaLocal: v.fecha.toLocaleString('es-AR'),
+        año: v.fecha.getFullYear(),
+        mes: v.fecha.getMonth() + 1,
+        día: v.fecha.getDate(),
+        monto: v.monto,
+        tipoTurno: v.tipoTurno,
+      })))
+      console.log('Últimas 20 ventas en la BD:', todasLasVentas.map(v => ({
+        fecha: v.fecha.toISOString(),
+        fechaLocal: v.fecha.toLocaleString('es-AR'),
+        año: v.fecha.getFullYear(),
+        mes: v.fecha.getMonth() + 1,
+        día: v.fecha.getDate(),
         monto: v.monto,
         tipoTurno: v.tipoTurno,
       })))
