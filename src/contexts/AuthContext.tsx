@@ -89,22 +89,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
+      console.log('[FRONTEND] AuthContext.login: Intentando login para:', email)
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        credentials: 'include', // Asegurar que se incluyan las cookies
       })
 
+      console.log('[FRONTEND] AuthContext.login: Response status:', response.status)
+
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Error al iniciar sesión')
+        let errorMessage = 'Error al iniciar sesión'
+        try {
+          const error = await response.json()
+          errorMessage = error.error || errorMessage
+          console.error('[FRONTEND] AuthContext.login: Error del servidor:', error)
+        } catch (e) {
+          console.error('[FRONTEND] AuthContext.login: Error al parsear respuesta:', e)
+          errorMessage = `Error ${response.status}: ${response.statusText}`
+        }
+        throw new Error(errorMessage)
       }
 
       const userData = await response.json()
+      console.log('[FRONTEND] AuthContext.login: Login exitoso, usuario:', userData)
       setUser(userData)
       router.push('/')
       router.refresh()
     } catch (error: any) {
+      console.error('[FRONTEND] AuthContext.login: Error completo:', error)
       throw error
     }
   }
