@@ -7,20 +7,37 @@ import { prisma } from '@/lib/prisma'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// GET: Listar todos los restaurantes (solo ADMIN puede ver/editar)
-export async function GET() {
+// GET: Listar restaurantes
+// - Todos los usuarios autenticados pueden ver restaurantes activos
+// - Solo ADMIN puede ver todos los restaurantes (activos e inactivos)
+export async function GET(request: NextRequest) {
   const user = await getCurrentUser()
   
-  // Solo ADMIN puede ver restaurantes
-  if (!isAdmin(user)) {
+  // Verificar autenticación
+  if (!user) {
     return NextResponse.json(
-      { error: 'No autorizado. Solo administradores pueden ver restaurantes.' },
-      { status: 403 }
+      { error: 'No autenticado' },
+      { status: 401 }
     )
   }
+
   try {
+    const { searchParams } = new URL(request.url)
+    const soloActivos = searchParams.get('activo') === 'true'
+    
+    // Si se solicita solo activos, cualquier usuario autenticado puede verlos
+    // Si no se especifica, solo ADMIN puede ver todos (activos e inactivos)
+    const where: any = {}
+    
+    if (soloActivos) {
+      where.activo = true
+    } else if (!isAdmin(user)) {
+      // Si no es admin y no especificó activo=true, solo mostrar activos por defecto
+      where.activo = true
+    }
+    
     const restaurantes = await prisma.restaurante.findMany({
-      where: { activo: true },
+      where,
       orderBy: { nombre: 'asc' },
     })
     return NextResponse.json(restaurantes)
