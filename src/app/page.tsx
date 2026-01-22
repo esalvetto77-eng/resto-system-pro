@@ -52,8 +52,13 @@ export default function HomePage() {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       const data = await response.json()
-      console.log('Estadísticas recibidas del servidor:', data)
+      console.log('=== ESTADÍSTICAS RECIBIDAS DEL SERVIDOR ===')
+      console.log('Datos completos:', JSON.stringify(data, null, 2))
       console.log('Total mensual en data:', data.totalMensual)
+      console.log('Total mensual sin IVA en data:', data.totalMensualSinIva)
+      console.log('Total diario en data:', data.totalDiario)
+      console.log('Ventas día en data:', data.ventasDay)
+      console.log('Ventas noche en data:', data.ventasNight)
       console.log('Tipo de totalMensual:', typeof data.totalMensual)
       setStats(data)
     } catch (error: any) {
