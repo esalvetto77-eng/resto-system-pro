@@ -266,16 +266,25 @@ export async function GET(request: NextRequest) {
     }
 
     if (userIsAdmin) {
-      const pagosPendientes = await prisma.pagoPendiente.findMany({
-        where: { pagado: false },
-        select: {
-          monto: true,
-        },
-      })
+      try {
+        const pagosPendientes = await prisma.pagoPendiente.findMany({
+          where: { pagado: false },
+          select: {
+            monto: true,
+          },
+        })
 
-      pagosPendientesStats = {
-        totalPendiente: pagosPendientes.reduce((sum, p) => sum + p.monto, 0),
-        cantidadPendientes: pagosPendientes.length,
+        pagosPendientesStats = {
+          totalPendiente: pagosPendientes.reduce((sum, p) => sum + p.monto, 0),
+          cantidadPendientes: pagosPendientes.length,
+        }
+      } catch (error: any) {
+        // Si la tabla no existe o hay algún error, simplemente usar valores por defecto
+        console.warn('No se pudieron obtener pagos pendientes (tabla puede no existir):', error?.message)
+        pagosPendientesStats = {
+          totalPendiente: 0,
+          cantidadPendientes: 0,
+        }
       }
     }
 
