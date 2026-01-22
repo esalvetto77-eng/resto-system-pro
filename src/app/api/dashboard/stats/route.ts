@@ -140,73 +140,26 @@ export async function GET(request: NextRequest) {
         whereVentasAmplio.restauranteId = restauranteId
       }
       
-      // Obtener todas las ventas del día
-      const ventasDelDia = await prisma.venta.findMany({
-        where: whereVentasAmplio,
-        select: {
-          id: true,
-          fecha: true,
-          monto: true,
-          tipoTurno: true,
-        },
-      })
-      
-      // Filtrar en memoria para asegurar que son del día correcto (por si hay problemas de zona horaria)
-      const ventasHoy = ventasDelDia.filter(v => {
-        const ventaYear = v.fecha.getFullYear()
-        const ventaMonth = v.fecha.getMonth()
-        const ventaDay = v.fecha.getDate()
-        return ventaYear === todayYear && ventaMonth === todayMonth && ventaDay === todayDay
-      })
-      
-      console.log('Ventas encontradas en rango:', ventasDelDia.length)
-      console.log('Ventas filtradas para hoy:', ventasHoy.length)
-      
-      // Usar los IDs de las ventas de hoy para las agregaciones
-      const ventasHoyIds = ventasHoy.map(v => v.id)
-      
-      const whereVentas: any = {}
-      if (ventasHoyIds.length > 0) {
-        whereVentas.id = { in: ventasHoyIds }
-      } else {
-        // Si no hay ventas, usar un filtro que no devuelva nada
-        whereVentas.id = { in: [] }
-      }
-      if (restauranteId) {
-        whereVentas.restauranteId = restauranteId
-      }
-
-      // Obtener todas las ventas de hoy para verificar y debug
-      const ventasHoyTest = await prisma.venta.findMany({
-        where: whereVentas,
-        select: {
-          id: true,
-          fecha: true,
-          monto: true,
-          tipoTurno: true,
-        },
-        take: 10,
-      })
-      
-      // También obtener todas las ventas sin filtro de fecha para debug
+      // Obtener TODAS las ventas (sin filtro de fecha primero para debug)
       const todasLasVentas = await prisma.venta.findMany({
+        where: restauranteId ? { restauranteId } : {},
         select: {
           id: true,
           fecha: true,
           monto: true,
           tipoTurno: true,
+          restauranteId: true,
         },
         orderBy: {
           fecha: 'desc',
         },
-        take: 20,
+        take: 50, // Obtener más para debug
       })
       
       console.log('=== DEBUG VENTAS DASHBOARD ===')
-      console.log('Fecha de hoy (inicio):', todayStart.toISOString())
-      console.log('Fecha de hoy (fin):', todayEnd.toISOString())
+      console.log('Total ventas en BD:', todasLasVentas.length)
       console.log('Fecha de hoy (año/mes/día):', `${todayYear}/${todayMonth + 1}/${todayDay}`)
-      console.log('Ventas encontradas para hoy (primeras 10):', ventasHoyTest.map(v => ({
+      console.log('Últimas ventas en la BD:', todasLasVentas.slice(0, 10).map(v => ({
         id: v.id,
         fecha: v.fecha.toISOString(),
         fechaLocal: v.fecha.toLocaleString('es-AR'),
@@ -215,51 +168,41 @@ export async function GET(request: NextRequest) {
         día: v.fecha.getDate(),
         monto: v.monto,
         tipoTurno: v.tipoTurno,
+        restauranteId: v.restauranteId,
       })))
-      console.log('Últimas 20 ventas en la BD:', todasLasVentas.map(v => ({
-        fecha: v.fecha.toISOString(),
-        fechaLocal: v.fecha.toLocaleString('es-AR'),
-        año: v.fecha.getFullYear(),
-        mes: v.fecha.getMonth() + 1,
-        día: v.fecha.getDate(),
+      
+      // Filtrar en memoria las ventas de hoy
+      const ventasHoy = todasLasVentas.filter(v => {
+        const ventaYear = v.fecha.getFullYear()
+        const ventaMonth = v.fecha.getMonth()
+        const ventaDay = v.fecha.getDate()
+        const esHoy = ventaYear === todayYear && ventaMonth === todayMonth && ventaDay === todayDay
+        return esHoy
+      })
+      
+      console.log('Ventas filtradas para hoy:', ventasHoy.length)
+      console.log('Ventas de hoy:', ventasHoy.map(v => ({
+        id: v.id,
+        fecha: v.fecha.toLocaleString('es-AR'),
         monto: v.monto,
         tipoTurno: v.tipoTurno,
       })))
 
-      // Ventas del día (DAY)
-      const ventasDay = await prisma.venta.aggregate({
-        where: {
-          ...whereVentas,
-          tipoTurno: 'DAY',
-        },
-        _sum: {
-          monto: true,
-        },
-      })
+      // Calcular totales directamente desde las ventas filtradas
+      const ventasDay = ventasHoy
+        .filter(v => v.tipoTurno === 'DAY')
+        .reduce((sum, v) => sum + v.monto, 0)
 
-      // Ventas del día (NIGHT)
-      const ventasNight = await prisma.venta.aggregate({
-        where: {
-          ...whereVentas,
-          tipoTurno: 'NIGHT',
-        },
-        _sum: {
-          monto: true,
-        },
-      })
+      const ventasNight = ventasHoy
+        .filter(v => v.tipoTurno === 'NIGHT')
+        .reduce((sum, v) => sum + v.monto, 0)
 
-      // Total diario
-      const totalDiario = await prisma.venta.aggregate({
-        where: whereVentas,
-        _sum: {
-          monto: true,
-        },
-      })
+      const totalDiario = ventasHoy.reduce((sum, v) => sum + v.monto, 0)
       
-      console.log('Agregados calculados:')
-      console.log('- Ventas DAY:', ventasDay._sum.monto)
-      console.log('- Ventas NIGHT:', ventasNight._sum.monto)
-      console.log('- Total Diario:', totalDiario._sum.monto)
+      console.log('Totales calculados:')
+      console.log('- Ventas DAY:', ventasDay)
+      console.log('- Ventas NIGHT:', ventasNight)
+      console.log('- Total Diario:', totalDiario)
 
       // Total mensual
       const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -287,9 +230,9 @@ export async function GET(request: NextRequest) {
       const totalMensualSinIva = totalMensualConIva / 1.22
 
       ventasStats = {
-        ventasDay: ventasDay._sum.monto || 0,
-        ventasNight: ventasNight._sum.monto || 0,
-        totalDiario: totalDiario._sum.monto || 0,
+        ventasDay: ventasDay,
+        ventasNight: ventasNight,
+        totalDiario: totalDiario,
         totalMensual: totalMensualConIva,
         totalMensualSinIva: totalMensualSinIva,
       }
