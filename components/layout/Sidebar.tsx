@@ -14,6 +14,7 @@ const navigation = [
   { name: 'Ajustes Turno', href: '/ajustes-turno', icon: Settings, adminOnly: false },
   { name: 'Liquidaciones', href: '/liquidaciones-profesionales', icon: Wallet, adminOnly: true },
   { name: 'Eventos Mensuales', href: '/eventos-mensuales', icon: FileText, adminOnly: true },
+  { name: 'Pagos Pendientes', href: '/pagos-pendientes', icon: DollarSign, adminOnly: true },
   { name: 'Proveedores', href: '/proveedores', icon: Package, adminOnly: false },
   { name: 'Productos', href: '/productos', icon: Utensils, adminOnly: false },
   { name: 'Recetas', href: '/recetas', icon: BookOpen, adminOnly: false },

@@ -254,6 +254,26 @@ export async function GET(request: NextRequest) {
       console.log('Fecha fin mes:', finMes.toISOString())
     }
 
+    // Estadísticas de pagos pendientes (solo ADMIN)
+    let pagosPendientesStats = {
+      totalPendiente: 0,
+      cantidadPendientes: 0,
+    }
+
+    if (userIsAdmin) {
+      const pagosPendientes = await prisma.pagoPendiente.findMany({
+        where: { pagado: false },
+        select: {
+          monto: true,
+        },
+      })
+
+      pagosPendientesStats = {
+        totalPendiente: pagosPendientes.reduce((sum, p) => sum + p.monto, 0),
+        cantidadPendientes: pagosPendientes.length,
+      }
+    }
+
     return NextResponse.json({
       empleadosActivos,
       proveedoresActivos,
@@ -263,6 +283,7 @@ export async function GET(request: NextRequest) {
       pedidosPendientes,
       restaurantesActivos,
       ...ventasStats,
+      ...pagosPendientesStats,
     })
   } catch (error) {
     console.error('Error al obtener estadísticas del dashboard:', error)
@@ -280,6 +301,8 @@ export async function GET(request: NextRequest) {
         totalDiario: 0,
         totalMensual: 0,
         totalMensualSinIva: 0,
+        totalPendiente: 0,
+        cantidadPendientes: 0,
       },
       { status: 500 }
     )

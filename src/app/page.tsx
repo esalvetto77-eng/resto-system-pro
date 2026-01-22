@@ -23,6 +23,8 @@ interface DashboardStats {
   totalDiario?: number
   totalMensual?: number
   totalMensualSinIva?: number
+  totalPendiente?: number
+  cantidadPendientes?: number
 }
 
 export default function HomePage() {
@@ -203,6 +205,16 @@ export default function HomePage() {
         href: '/ventas',
         formatCurrency: true,
       },
+      {
+        title: 'Pagos Pendientes',
+        value: Number(statsToShow.totalPendiente) || 0,
+        color: 'bg-paper-100 border-paper-300',
+        textColor: 'text-paper-800',
+        href: '/pagos-pendientes',
+        formatCurrency: true,
+        alert: (statsToShow.cantidadPendientes || 0) > 0,
+        subtitle: `${statsToShow.cantidadPendientes || 0} ${(statsToShow.cantidadPendientes || 0) === 1 ? 'pago' : 'pagos'}`,
+      },
     ] : []),
   ]
 
@@ -243,6 +255,12 @@ export default function HomePage() {
       href: '/ventas/nuevo',
       description: 'Registrar venta',
     },
+    // Solo ADMIN puede gestionar pagos pendientes
+    ...(isAdmin() ? [{
+      name: 'Nuevo Pago Pendiente',
+      href: '/pagos-pendientes/nuevo',
+      description: 'Registrar pago a proveedor',
+    }] : []),
   ]
 
   // Mostrar loading solo si realmente está cargando y no hay datos
@@ -297,6 +315,11 @@ export default function HomePage() {
                           }).format(kpi.value)
                         : kpi.value.toLocaleString()}
                     </p>
+                    {(kpi as any).subtitle && (
+                      <p className="text-xs text-neutral-500 mt-1">
+                        {(kpi as any).subtitle}
+                      </p>
+                    )}
                     {kpi.alert && (
                       <Badge variant="warning" className="mt-3">
                         Requiere atención

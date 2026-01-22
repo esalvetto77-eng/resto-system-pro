@@ -25,6 +25,7 @@ model Proveedor {
   metodoPago    String?
   pedidos       Pedido[]
   productos     ProductoProveedor[]
+  pagosPendientes PagoPendiente[]
 
   @@index([activo])
   @@index([rubro])
@@ -488,6 +489,26 @@ model Venta {
   @@index([fecha, tipoTurno])
   @@map("ventas")
 }
+model PagoPendiente {
+  id            String    @id @default(cuid())
+  proveedorId   String
+  fecha         DateTime
+  monto         Float
+  descripcion   String?
+  pagado        Boolean   @default(false)
+  fechaPago     DateTime?
+  observaciones String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  proveedor     Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
+
+  @@index([proveedorId])
+  @@index([fecha])
+  @@index([pagado])
+  @@index([fecha, pagado])
+  @@map("pagos_pendientes")
+}
+
 model Test {
   id        String   @id @default(uuid())
   name      String
