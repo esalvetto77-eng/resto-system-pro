@@ -14,32 +14,57 @@ export async function GET(request: NextRequest) {
     console.log('[API PRODUCTOS] Iniciando consulta de productos...')
     console.log('[API PRODUCTOS] Solo activos:', soloActivos)
     
-    const productos = await prisma.producto.findMany({
+    // Primero hacer una consulta simple para verificar que hay productos
+    const countProductos = await prisma.producto.count({
       where: soloActivos ? { activo: true } : {},
-      include: {
-        proveedores: {
-          include: {
-            proveedor: {
-              select: {
-                id: true,
-                nombre: true,
+    })
+    console.log('[API PRODUCTOS] Total productos en BD:', countProductos)
+    
+    // Intentar consulta simple primero (sin includes complejos)
+    let productos
+    try {
+      productos = await prisma.producto.findMany({
+        where: soloActivos ? { activo: true } : {},
+        include: {
+          proveedores: {
+            include: {
+              proveedor: {
+                select: {
+                  id: true,
+                  nombre: true,
+                },
               },
             },
+            orderBy: {
+              ordenPreferencia: 'asc',
+            },
           },
-          orderBy: {
-            ordenPreferencia: 'asc',
-          },
+          inventario: true,
         },
-        inventario: true,
-      },
-      orderBy: { nombre: 'asc' },
-    })
+        orderBy: { nombre: 'asc' },
+      })
+      console.log('[API PRODUCTOS] Productos encontrados con includes:', productos.length)
+    } catch (includeError: any) {
+      console.error('[API PRODUCTOS] Error con includes, intentando sin includes:', includeError)
+      // Si falla con includes, intentar sin ellos
+      productos = await prisma.producto.findMany({
+        where: soloActivos ? { activo: true } : {},
+        orderBy: { nombre: 'asc' },
+      })
+      console.log('[API PRODUCTOS] Productos encontrados sin includes:', productos.length)
+      // Agregar arrays vacíos para proveedores e inventario
+      productos = productos.map((p: any) => ({
+        ...p,
+        proveedores: [],
+        inventario: null,
+      }))
+    }
     
-    console.log('[API PRODUCTOS] Productos encontrados:', productos.length)
     console.log('[API PRODUCTOS] Primer producto (ejemplo):', productos[0] ? {
       id: productos[0].id,
       nombre: productos[0].nombre,
-      proveedoresCount: productos[0].proveedores.length,
+      activo: productos[0].activo,
+      proveedoresCount: productos[0].proveedores?.length || 0,
     } : 'No hay productos')
     
     // Asegurar que los campos nuevos tengan valores por defecto si son null (para productos antiguos)
