@@ -169,15 +169,35 @@ export default function EmpleadoDetailPage({
         body: formData,
       })
 
-      if (!response.ok) throw new Error('Error al subir documento')
+      if (!response.ok) {
+        // Intentar obtener el mensaje de error del servidor
+        let errorMessage = 'Error al subir el documento'
+        try {
+          const errorData = await response.json()
+          if (errorData.error) {
+            errorMessage = errorData.error
+          }
+        } catch (e) {
+          // Si no se puede parsear el JSON, usar el mensaje por defecto
+          console.error('No se pudo parsear el error del servidor:', e)
+        }
+        throw new Error(errorMessage)
+      }
+
+      const data = await response.json()
 
       // Resetear formulario y recargar empleado
       setUploadForm({ nombre: '', descripcion: '', file: null })
       setShowUploadForm(false)
       await fetchEmpleado()
-    } catch (error) {
-      console.error('Error:', error)
-      alert('Error al subir el documento')
+      
+      // Mostrar mensaje de éxito
+      alert('Documento subido exitosamente')
+    } catch (error: any) {
+      console.error('Error al subir documento:', error)
+      // Mostrar el mensaje de error específico
+      const errorMessage = error?.message || 'Error al subir el documento. Por favor, intenta nuevamente.'
+      alert(errorMessage)
     } finally {
       setUploading(false)
     }
