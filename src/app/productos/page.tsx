@@ -23,6 +23,9 @@ interface Producto {
   proveedores: Array<{
     id: string
     precioCompra: number | null
+    moneda: string | null
+    precioEnDolares: number | null
+    precioEnPesos: number | null
     ordenPreferencia: number
     proveedor: { id: string; nombre: string }
   }>
@@ -260,17 +263,41 @@ export default function ProductosPage() {
                             <div className="space-y-1">
                               {producto.proveedores
                                 .filter(pp => pp.precioCompra !== null)
-                                .sort((a, b) => (a.precioCompra || 0) - (b.precioCompra || 0))
+                                .sort((a, b) => {
+                                  // Ordenar por precio en pesos (precioEnPesos o precioCompra si es UYU)
+                                  const precioA = a.precioEnPesos || (a.moneda === 'UYU' ? a.precioCompra : null) || 0
+                                  const precioB = b.precioEnPesos || (b.moneda === 'UYU' ? b.precioCompra : null) || 0
+                                  return precioA - precioB
+                                })
                                 .map((pp, idx) => {
+                                  const precioEnPesos = pp.precioEnPesos || (pp.moneda === 'UYU' ? pp.precioCompra : null)
                                   const isCheapest = idx === 0 && producto.proveedores.filter(p => p.precioCompra !== null).length > 1
+                                  const moneda = pp.moneda || 'UYU'
+                                  
                                   return (
                                     <div key={pp.id} className="text-sm">
-                                      <ProtectedPrice
-                                        value={pp.precioCompra}
-                                        formatter={formatCurrency}
-                                        fallback={<span className="text-neutral-400">-</span>}
-                                        className={isCheapest ? 'font-medium text-terracotta-700' : 'text-neutral-600'}
-                                      />
+                                      <div className={isCheapest ? 'font-medium text-terracotta-700' : 'text-neutral-600'}>
+                                        {moneda === 'USD' ? (
+                                          <>
+                                            <ProtectedPrice
+                                              value={pp.precioCompra}
+                                              formatter={(v) => `$${v?.toFixed(2) || '0.00'} USD`}
+                                              fallback={<span className="text-neutral-400">-</span>}
+                                            />
+                                            {precioEnPesos && (
+                                              <div className="text-xs text-neutral-500 mt-0.5">
+                                                ≈ {formatCurrency(precioEnPesos)} UYU
+                                              </div>
+                                            )}
+                                          </>
+                                        ) : (
+                                          <ProtectedPrice
+                                            value={pp.precioCompra}
+                                            formatter={formatCurrency}
+                                            fallback={<span className="text-neutral-400">-</span>}
+                                          />
+                                        )}
+                                      </div>
                                       {isCheapest && canSeePrices() && (
                                         <span className="ml-1 text-xs text-terracotta-600">↓</span>
                                       )}

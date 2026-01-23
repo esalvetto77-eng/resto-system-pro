@@ -57,7 +57,12 @@ model ProductoProveedor {
   id               String    @id @default(cuid())
   productoId       String
   proveedorId      String
-  precioCompra     Float?
+  precioCompra     Float?    // Precio en la moneda especificada
+  moneda           String?   @default("UYU") // "USD" o "UYU"
+  precioEnDolares  Float?    // Precio en dólares (si moneda es USD)
+  precioEnPesos    Float?    // Precio en pesos uruguayos (calculado)
+  cotizacionUsada Float?    // Cotización del dólar usada para la conversión
+  fechaCotizacion  DateTime? // Fecha de la cotización usada
   ordenPreferencia Int       @default(1)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt

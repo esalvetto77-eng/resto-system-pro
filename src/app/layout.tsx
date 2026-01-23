@@ -4,6 +4,7 @@ import './globals.css'
 import { RestauranteProvider } from '@/contexts/RestauranteContext'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { Sidebar } from '@/components/layout/Sidebar'
+import { CotizacionDolar } from '@/components/CotizacionDolar'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -25,8 +26,14 @@ export default function RootLayout({
             <div className="flex min-h-screen bg-neutral-50">
               <Sidebar />
               <main className="flex-1 ml-64">
-                <div className="p-12">
-                  {children}
+                <div className="relative">
+                  {/* Cotización del dólar en esquina superior derecha */}
+                  <div className="absolute top-4 right-4 z-10">
+                    <CotizacionDolar />
+                  </div>
+                  <div className="p-12">
+                    {children}
+                  </div>
                 </div>
               </main>
             </div>

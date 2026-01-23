@@ -109,15 +109,51 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Obtener cotización actual del dólar
+        let cotizacionActual = null
+        try {
+          const { obtenerCotizacionBROU } = await import('@/app/api/cotizacion-dolar/route')
+          const cotizacionData = await obtenerCotizacionBROU()
+          if (cotizacionData) {
+            cotizacionActual = (cotizacionData.compra + cotizacionData.venta) / 2
+          }
+        } catch (err) {
+          console.warn('No se pudo obtener cotización, se guardará sin conversión:', err)
+        }
+
         await tx.productoProveedor.createMany({
           data: body.proveedores
             .filter((prov: any) => prov.proveedorId)
-            .map((prov: any, index: number) => ({
-              productoId: nuevoProducto.id,
-              proveedorId: prov.proveedorId,
-              precioCompra: toNumberOrNull(prov.precioCompra),
-              ordenPreferencia: prov.ordenPreferencia || index + 1,
-            })),
+            .map((prov: any, index: number) => {
+              const precio = toNumberOrNull(prov.precioCompra)
+              const moneda = prov.moneda || 'UYU'
+              
+              // Calcular precios según la moneda
+              let precioEnDolares = null
+              let precioEnPesos = null
+              
+              if (precio) {
+                if (moneda === 'USD') {
+                  precioEnDolares = precio
+                  precioEnPesos = cotizacionActual ? precio * cotizacionActual : null
+                } else {
+                  precioEnPesos = precio
+                  precioEnDolares = cotizacionActual ? precio / cotizacionActual : null
+                }
+              }
+              
+              return {
+                productoId: nuevoProducto.id,
+                proveedorId: prov.proveedorId,
+                precioCompra: precio,
+                moneda: moneda,
+                precioEnDolares: precioEnDolares,
+                precioEnPesos: precioEnPesos,
+                cotizacionUsada: cotizacionActual,
+                fechaCotizacion: cotizacionActual ? new Date() : null,
+                ordenPreferencia: prov.ordenPreferencia || index + 1,
+              }
+            }),
         })
       }
 
