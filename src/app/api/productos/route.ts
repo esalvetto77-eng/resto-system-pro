@@ -7,10 +7,15 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 // GET: Listar todos los productos
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const soloActivos = searchParams.get('activo') === 'true'
   try {
+    console.log('[API PRODUCTOS] Iniciando consulta de productos...')
+    console.log('[API PRODUCTOS] Solo activos:', soloActivos)
+    
     const productos = await prisma.producto.findMany({
-      where: { activo: true },
+      where: soloActivos ? { activo: true } : {},
       include: {
         proveedores: {
           include: {
@@ -30,6 +35,13 @@ export async function GET() {
       orderBy: { nombre: 'asc' },
     })
     
+    console.log('[API PRODUCTOS] Productos encontrados:', productos.length)
+    console.log('[API PRODUCTOS] Primer producto (ejemplo):', productos[0] ? {
+      id: productos[0].id,
+      nombre: productos[0].nombre,
+      proveedoresCount: productos[0].proveedores.length,
+    } : 'No hay productos')
+    
     // Asegurar que los campos nuevos tengan valores por defecto si son null (para productos antiguos)
     const productosConDefaults = productos.map(producto => ({
       ...producto,
@@ -43,10 +55,14 @@ export async function GET() {
       })),
     }))
     
+    console.log('[API PRODUCTOS] Devolviendo productos:', productosConDefaults.length)
     return NextResponse.json(productosConDefaults)
   } catch (error: any) {
-    console.error('Error en GET /api/productos:', error?.message || String(error))
-    console.error('Stack:', error?.stack)
+    console.error('[API PRODUCTOS] Error completo:', error)
+    console.error('[API PRODUCTOS] Error message:', error?.message || String(error))
+    console.error('[API PRODUCTOS] Error stack:', error?.stack)
+    console.error('[API PRODUCTOS] Error name:', error?.name)
+    
     // En caso de error, devolver array vacío para que no rompa el frontend
     return NextResponse.json([])
   }
