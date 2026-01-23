@@ -18,29 +18,20 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const hoy = new Date()
-    hoy.setHours(0, 0, 0, 0)
-    const en15Dias = new Date()
-    en15Dias.setDate(hoy.getDate() + 15)
-    en15Dias.setHours(23, 59, 59, 999)
-
-    // Obtener empleados activos con carnets que vencen en los próximos 15 días
+    // Obtener TODOS los empleados activos que tengan al menos un carnet configurado
+    // Luego filtraremos en memoria para evitar problemas con zonas horarias
     const empleados = await prisma.empleado.findMany({
       where: {
         activo: true,
         OR: [
           {
-            // Carnet de manipulación por vencer
             carnetManipulacionVencimiento: {
-              gte: hoy,
-              lte: en15Dias,
+              not: null,
             },
           },
           {
-            // Carnet de salud por vencer
             carnetSaludVencimiento: {
-              gte: hoy,
-              lte: en15Dias,
+              not: null,
             },
           },
         ],
@@ -53,6 +44,17 @@ export async function GET(request: NextRequest) {
         carnetSaludVencimiento: true,
       },
     })
+
+    // Calcular fechas de referencia (solo fecha, sin hora)
+    const hoy = new Date()
+    hoy.setHours(0, 0, 0, 0)
+    const en15Dias = new Date()
+    en15Dias.setDate(hoy.getDate() + 15)
+    en15Dias.setHours(23, 59, 59, 999)
+
+    console.log('[API] Total empleados con carnets:', empleados.length)
+    console.log('[API] Fecha hoy:', hoy.toISOString())
+    console.log('[API] Fecha en 15 días:', en15Dias.toISOString())
 
     console.log('[API] Empleados encontrados con carnets por vencer:', empleados.length)
     console.log('[API] Fecha hoy:', hoy.toISOString())
@@ -68,11 +70,16 @@ export async function GET(request: NextRequest) {
 
       if (empleado.carnetManipulacionVencimiento) {
         const fechaVenc = new Date(empleado.carnetManipulacionVencimiento)
+        // Normalizar a medianoche para comparar solo fechas
         fechaVenc.setHours(0, 0, 0, 0)
-        const diasRestantes = Math.ceil(
-          (fechaVenc.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)
-        )
+        
+        // Calcular días restantes
+        const diferenciaMs = fechaVenc.getTime() - hoy.getTime()
+        const diasRestantes = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24))
 
+        console.log(`[API] Empleado ${empleado.nombre}: Manipulación vence ${fechaVenc.toISOString()}, días restantes: ${diasRestantes}`)
+
+        // Incluir si vence en los próximos 15 días (incluyendo hoy) y no está vencido
         if (diasRestantes >= 0 && diasRestantes <= 15) {
           alertasEmpleado.push({
             tipo: 'manipulacion',
@@ -84,11 +91,16 @@ export async function GET(request: NextRequest) {
 
       if (empleado.carnetSaludVencimiento) {
         const fechaVenc = new Date(empleado.carnetSaludVencimiento)
+        // Normalizar a medianoche para comparar solo fechas
         fechaVenc.setHours(0, 0, 0, 0)
-        const diasRestantes = Math.ceil(
-          (fechaVenc.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)
-        )
+        
+        // Calcular días restantes
+        const diferenciaMs = fechaVenc.getTime() - hoy.getTime()
+        const diasRestantes = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24))
 
+        console.log(`[API] Empleado ${empleado.nombre}: Salud vence ${fechaVenc.toISOString()}, días restantes: ${diasRestantes}`)
+
+        // Incluir si vence en los próximos 15 días (incluyendo hoy) y no está vencido
         if (diasRestantes >= 0 && diasRestantes <= 15) {
           alertasEmpleado.push({
             tipo: 'salud',
