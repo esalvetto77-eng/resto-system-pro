@@ -30,9 +30,24 @@ export async function GET() {
       orderBy: { nombre: 'asc' },
     })
     
-    return NextResponse.json(productos)
+    // Asegurar que los campos nuevos tengan valores por defecto si son null (para productos antiguos)
+    const productosConDefaults = productos.map(producto => ({
+      ...producto,
+      proveedores: producto.proveedores.map((pp: any) => ({
+        ...pp,
+        moneda: pp.moneda || 'UYU',
+        precioEnDolares: pp.precioEnDolares ?? null,
+        precioEnPesos: pp.precioEnPesos ?? (pp.moneda === 'UYU' || !pp.moneda ? pp.precioCompra : null),
+        cotizacionUsada: pp.cotizacionUsada ?? null,
+        fechaCotizacion: pp.fechaCotizacion ?? null,
+      })),
+    }))
+    
+    return NextResponse.json(productosConDefaults)
   } catch (error: any) {
     console.error('Error en GET /api/productos:', error?.message || String(error))
+    console.error('Stack:', error?.stack)
+    // En caso de error, devolver array vacío para que no rompa el frontend
     return NextResponse.json([])
   }
 }
