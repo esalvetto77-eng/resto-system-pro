@@ -7,6 +7,11 @@ const nextConfig = {
   // Excluir paquetes del procesamiento de webpack (para @vercel/blob)
   serverComponentsExternalPackages: ['@vercel/blob'],
   
+  // Configuración experimental para manejar mejor las dependencias
+  experimental: {
+    serverComponentsExternalPackages: ['@vercel/blob'],
+  },
+  
   // Headers de seguridad
   async headers() {
     const cspReportOnly = [
@@ -112,21 +117,15 @@ const nextConfig = {
     // Asegurar que webpack pueda resolver extensiones .tsx
     config.resolve.extensions = [...(config.resolve.extensions || []), '.ts', '.tsx', '.js', '.jsx']
     
-    // Excluir undici del procesamiento de webpack (usado por @vercel/blob)
-    // Esto evita problemas de compatibilidad con Next.js 14.0.4
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        'undici': false,
-      }
-    }
-    
-    // Configurar para que webpack ignore node_modules problemáticos
-    config.externals = config.externals || []
+    // Configurar para manejar mejor @vercel/blob y sus dependencias
     if (isServer) {
-      config.externals.push({
-        'undici': 'commonjs undici',
-      })
+      // En el servidor, excluir undici del bundle
+      config.externals = config.externals || []
+      if (Array.isArray(config.externals)) {
+        config.externals.push('undici')
+      } else if (typeof config.externals === 'object') {
+        config.externals.undici = 'commonjs undici'
+      }
     }
     
     return config
