@@ -4,6 +4,9 @@ const path = require('path')
 const nextConfig = {
   reactStrictMode: true,
   
+  // Excluir paquetes del procesamiento de webpack (para @vercel/blob)
+  serverComponentsExternalPackages: ['@vercel/blob'],
+  
   // Headers de seguridad
   async headers() {
     const cspReportOnly = [
@@ -94,7 +97,7 @@ const nextConfig = {
   },
 
   // Configurar webpack para resolver alias @/* correctamente en Vercel
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     const rootPath = path.resolve(__dirname)
     config.resolve.alias = {
       ...config.resolve.alias,
@@ -108,6 +111,24 @@ const nextConfig = {
     }
     // Asegurar que webpack pueda resolver extensiones .tsx
     config.resolve.extensions = [...(config.resolve.extensions || []), '.ts', '.tsx', '.js', '.jsx']
+    
+    // Excluir undici del procesamiento de webpack (usado por @vercel/blob)
+    // Esto evita problemas de compatibilidad con Next.js 14.0.4
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        'undici': false,
+      }
+    }
+    
+    // Configurar para que webpack ignore node_modules problemáticos
+    config.externals = config.externals || []
+    if (isServer) {
+      config.externals.push({
+        'undici': 'commonjs undici',
+      })
+    }
+    
     return config
   },
 }
