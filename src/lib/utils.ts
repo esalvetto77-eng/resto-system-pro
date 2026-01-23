@@ -94,6 +94,21 @@ export function fechaVencePronto(fecha: Date | string | null | undefined): boole
   return d >= hoy && d <= en30Dias
 }
 
+export function fechaVenceEn15Dias(fecha: Date | string | null | undefined): boolean {
+  if (!fecha) return false
+  const d = typeof fecha === 'string' ? new Date(fecha) : fecha
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0) // Resetear horas para comparar solo fechas
+  const en15Dias = new Date()
+  en15Dias.setDate(hoy.getDate() + 15)
+  en15Dias.setHours(23, 59, 59, 999) // Fin del día 15
+  const fechaVencimiento = new Date(d)
+  fechaVencimiento.setHours(0, 0, 0, 0)
+  
+  // Vence en los próximos 15 días (incluyendo hoy)
+  return fechaVencimiento >= hoy && fechaVencimiento <= en15Dias && !fechaVencida(fecha)
+}
+
 export function calcularHorarioTurno(
   dia: string,
   diasDescanso: Record<string, string>,

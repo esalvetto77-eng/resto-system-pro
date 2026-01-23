@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useRestaurante } from '@/contexts/RestauranteContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { formatDateShort } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,11 +28,23 @@ interface DashboardStats {
   cantidadPendientes?: number
 }
 
+interface AlertaCarnet {
+  empleadoId: string
+  nombre: string
+  alertas: Array<{
+    tipo: 'manipulacion' | 'salud'
+    fechaVencimiento: string
+    diasRestantes: number
+  }>
+}
+
 export default function HomePage() {
   const { restauranteActivo, loading: loadingRestaurante } = useRestaurante()
   const { isAdmin } = useAuth()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [alertasCarnets, setAlertasCarnets] = useState<AlertaCarnet[]>([])
+  const [loadingAlertas, setLoadingAlertas] = useState(false)
 
   const fetchStats = async () => {
     try {
@@ -86,9 +99,41 @@ export default function HomePage() {
     }
   }
 
+  const fetchAlertasCarnets = async () => {
+    if (!isAdmin()) {
+      console.log('[ALERTAS] Usuario no es admin, no se cargan alertas')
+      return // Solo admins pueden ver alertas de carnets
+    }
+    
+    try {
+      setLoadingAlertas(true)
+      console.log('[ALERTAS] Cargando alertas de carnets...')
+      const response = await fetch('/api/empleados/carnets-por-vencer')
+      console.log('[ALERTAS] Response status:', response.status)
+      
+      const data = await response.json()
+      console.log('[ALERTAS] Datos recibidos:', data)
+      
+      if (response.ok) {
+        console.log('[ALERTAS] Total empleados con alertas:', data.total)
+        console.log('[ALERTAS] Empleados:', data.empleados)
+        setAlertasCarnets(data.empleados || [])
+      } else {
+        console.error('[ALERTAS] Error en la respuesta:', response.status, data)
+        // Si hay error, establecer array vacío para que no se muestre nada
+        setAlertasCarnets([])
+      }
+    } catch (error) {
+      console.error('[ALERTAS] Error al cargar alertas de carnets:', error)
+    } finally {
+      setLoadingAlertas(false)
+    }
+  }
+
   useEffect(() => {
     // No esperar si ya hay restaurante o si ya pasó suficiente tiempo
     fetchStats()
+    fetchAlertasCarnets()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restauranteActivo?.id])
   
@@ -298,6 +343,86 @@ export default function HomePage() {
           )}
         </p>
       </div>
+
+      {/* Alertas de Carnets por Vencer */}
+      {isAdmin() && (
+        <>
+          {loadingAlertas && (
+            <Card className="border-neutral-200 bg-neutral-50">
+              <CardBody className="p-4">
+                <p className="text-sm text-neutral-600">Cargando alertas de carnets...</p>
+              </CardBody>
+            </Card>
+          )}
+          
+          {!loadingAlertas && alertasCarnets.length === 0 && (
+            <Card className="border-neutral-200 bg-neutral-50">
+              <CardBody className="p-4">
+                <p className="text-sm text-neutral-600">
+                  ✅ No hay carnets por vencer en los próximos 15 días
+                </p>
+              </CardBody>
+            </Card>
+          )}
+
+          {!loadingAlertas && alertasCarnets.length > 0 && (
+        <Card className="border-yellow-300 bg-yellow-50">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-yellow-900" style={{ fontWeight: 600 }}>
+                ⚠️ Alertas: Carnets por Vencer (15 días)
+              </h2>
+              <Badge variant="warning">{alertasCarnets.length} {alertasCarnets.length === 1 ? 'empleado' : 'empleados'}</Badge>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <div className="space-y-3">
+              {alertasCarnets.map((alerta) => (
+                <div
+                  key={alerta.empleadoId}
+                  className="p-4 bg-white rounded-lg border border-yellow-200"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <Link
+                        href={`/empleados/${alerta.empleadoId}`}
+                        className="font-semibold text-neutral-900 hover:text-terracotta-600 transition-colors"
+                      >
+                        {alerta.nombre}
+                      </Link>
+                      <div className="mt-2 space-y-1">
+                        {alerta.alertas.map((a, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-sm">
+                            <Badge
+                              variant={a.diasRestantes <= 7 ? 'error' : 'warning'}
+                              className="text-xs"
+                            >
+                              {a.tipo === 'manipulacion' ? 'Carnet Manipulación' : 'Carnet Salud'}
+                            </Badge>
+                            <span className="text-neutral-700">
+                              Vence: {formatDateShort(a.fechaVencimiento)}
+                            </span>
+                            <span className="text-neutral-500">
+                              ({a.diasRestantes} {a.diasRestantes === 1 ? 'día' : 'días'} restantes)
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <Link href={`/empleados/${alerta.empleadoId}`}>
+                      <Button size="sm" variant="secondary">
+                        Ver Empleado
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+          )}
+        </>
+      )}
 
       {/* KPIs Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
