@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
         // Obtener cotización actual del dólar
         let cotizacionActual = null
         try {
-          const { obtenerCotizacionBROU } = await import('@/app/api/cotizacion-dolar/route')
+          const { obtenerCotizacionBROU } = await import('@/lib/utils')
           const cotizacionData = await obtenerCotizacionBROU()
           if (cotizacionData) {
             cotizacionActual = (cotizacionData.compra + cotizacionData.venta) / 2
