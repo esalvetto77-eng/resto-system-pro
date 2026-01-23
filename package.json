@@ -7,7 +7,7 @@
     "dev:clean": "powershell -ExecutionPolicy Bypass -File ./iniciar-servidor.ps1",
     "dev:stop": "powershell -ExecutionPolicy Bypass -File ./detener-servidor.ps1",
     "build": "npx prisma generate && next build",
-    "vercel-build": "npx prisma generate && npx prisma migrate deploy && next build",
+    "vercel-build": "npx prisma generate && npx prisma db push --accept-data-loss && next build",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "npx prisma generate",
