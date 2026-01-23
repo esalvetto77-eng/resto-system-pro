@@ -4,9 +4,6 @@ const path = require('path')
 const nextConfig = {
   reactStrictMode: true,
   
-  // Excluir paquetes del procesamiento de webpack (para @vercel/blob)
-  serverComponentsExternalPackages: ['@vercel/blob'],
-  
   // Configuración experimental para manejar mejor las dependencias
   experimental: {
     serverComponentsExternalPackages: ['@vercel/blob'],
