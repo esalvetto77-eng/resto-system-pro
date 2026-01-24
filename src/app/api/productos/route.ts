@@ -74,21 +74,10 @@ export async function GET(request: NextRequest) {
       proveedoresCount: productos[0].proveedores?.length || 0,
     } : 'No hay productos')
     
-    // Asegurar que los campos nuevos tengan valores por defecto si son null (para productos antiguos)
-    const productosConDefaults = productos.map(producto => ({
-      ...producto,
-      proveedores: producto.proveedores.map((pp: any) => ({
-        ...pp,
-        moneda: pp.moneda || 'UYU',
-        precioEnDolares: pp.precioEnDolares ?? null,
-        precioEnPesos: pp.precioEnPesos ?? (pp.moneda === 'UYU' || !pp.moneda ? pp.precioCompra : null),
-        cotizacionUsada: pp.cotizacionUsada ?? null,
-        fechaCotizacion: pp.fechaCotizacion ?? null,
-      })),
-    }))
-    
-    console.log('[API PRODUCTOS] Devolviendo productos:', productosConDefaults.length)
-    return NextResponse.json(productosConDefaults)
+    // Los campos de moneda se leerán desde SQL directo si existen
+    // Por ahora, devolver los productos tal como están (sin campos de moneda)
+    console.log('[API PRODUCTOS] Devolviendo productos:', productos.length)
+    return NextResponse.json(productos)
   } catch (error: any) {
     console.error('[API PRODUCTOS] Error completo:', error)
     console.error('[API PRODUCTOS] Error message:', error?.message || String(error))
