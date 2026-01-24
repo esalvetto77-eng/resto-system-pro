@@ -140,34 +140,51 @@ export async function obtenerCotizacionBROU(): Promise<CotizacionBROU | null> {
     // Buscar tasa para UYU (Peso Uruguayo)
     const tasaUYU = data.rates?.UYU
     
-    if (!tasaUYU) {
-      // Si no está disponible, usar un valor por defecto
-      // IMPORTANTE: Deberías actualizar esto manualmente o configurar una variable de entorno
-      console.warn('[COTIZACION] No se encontró tasa UYU, usando valor por defecto')
-      
-      // Intentar obtener desde variable de entorno (si está configurada)
-      const cotizacionManual = process.env.COTIZACION_DOLAR_BROU
-      if (cotizacionManual) {
-        const valor = parseFloat(cotizacionManual)
+    // Intentar obtener desde variable de entorno primero (tiene prioridad)
+    const cotizacionManual = process.env.COTIZACION_DOLAR_BROU
+    if (cotizacionManual) {
+      const valor = parseFloat(cotizacionManual)
+      if (!isNaN(valor) && valor > 0) {
+        // Spread típico del BROU: aproximadamente 0.5-1 UYU
+        const spread = 0.75
         return {
-          compra: valor - 0.25,
-          venta: valor + 0.25,
+          compra: valor - spread / 2,
+          venta: valor + spread / 2,
           fecha: new Date().toISOString().split('T')[0],
           fuente: 'BROU (configuración manual)',
         }
       }
+    }
+    
+    if (!tasaUYU || tasaUYU < 35 || tasaUYU > 45) {
+      // Si la tasa no es razonable o no está disponible, usar valor por defecto actualizado
+      console.warn('[COTIZACION] Tasa UYU no válida o fuera de rango, usando valor por defecto')
       
+      // Valor por defecto actualizado (enero 2026): ~38.9 UYU
+      const valorDefault = 38.9
+      const spread = 0.75
       return {
-        compra: 39.5, // Valor por defecto - ACTUALIZAR MANUALMENTE
-        venta: 40.0,
+        compra: valorDefault - spread / 2,
+        venta: valorDefault + spread / 2,
         fecha: new Date().toISOString().split('T')[0],
         fuente: 'BROU (valor por defecto - actualizar)',
       }
     }
     
     // El BROU generalmente tiene una diferencia entre compra y venta
-    // Spread típico del BROU: aproximadamente 0.5 UYU
-    const spread = 0.5
+    // Spread típico del BROU: aproximadamente 0.5-1 UYU
+    const spread = 0.75
+    
+    // Si la tasa obtenida es muy diferente a la esperada, usar valor por defecto
+    if (tasaUYU < 35 || tasaUYU > 45) {
+      const valorDefault = 38.9
+      return {
+        compra: valorDefault - spread / 2,
+        venta: valorDefault + spread / 2,
+        fecha: new Date().toISOString().split('T')[0],
+        fuente: 'BROU (valor por defecto - tasa API fuera de rango)',
+      }
+    }
     
     // Usar la tasa obtenida como referencia (promedio)
     // Ajustar para compra (menor) y venta (mayor)
@@ -184,18 +201,23 @@ export async function obtenerCotizacionBROU(): Promise<CotizacionBROU | null> {
     const cotizacionManual = process.env.COTIZACION_DOLAR_BROU
     if (cotizacionManual) {
       const valor = parseFloat(cotizacionManual)
-      return {
-        compra: valor - 0.25,
-        venta: valor + 0.25,
-        fecha: new Date().toISOString().split('T')[0],
-        fuente: 'BROU (configuración manual)',
+      if (!isNaN(valor) && valor > 0) {
+        const spread = 0.75
+        return {
+          compra: valor - spread / 2,
+          venta: valor + spread / 2,
+          fecha: new Date().toISOString().split('T')[0],
+          fuente: 'BROU (configuración manual)',
+        }
       }
     }
     
-    // Valor por defecto si todo falla
+    // Valor por defecto actualizado si todo falla (enero 2026: ~38.9 UYU)
+    const valorDefault = 38.9
+    const spread = 0.75
     return {
-      compra: 39.5,
-      venta: 40.0,
+      compra: valorDefault - spread / 2,
+      venta: valorDefault + spread / 2,
       fecha: new Date().toISOString().split('T')[0],
       fuente: 'BROU (valor por defecto)',
     }
