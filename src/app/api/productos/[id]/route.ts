@@ -15,12 +15,29 @@ export async function GET(
   try {
     console.log('[API PRODUCTO] Obteniendo producto:', params.id)
     
-    // Consulta básica - no especificar campos nuevos que pueden no existir
+    // Usar select explícito para evitar leer campos que no existen en la BD
     const producto = await prisma.producto.findUnique({
       where: { id: params.id },
-      include: {
+      select: {
+        id: true,
+        nombre: true,
+        codigo: true,
+        descripcion: true,
+        unidad: true,
+        stockMinimo: true,
+        rubro: true,
+        activo: true,
+        createdAt: true,
+        updatedAt: true,
         proveedores: {
-          include: {
+          select: {
+            id: true,
+            productoId: true,
+            proveedorId: true,
+            precioCompra: true,
+            ordenPreferencia: true,
+            createdAt: true,
+            updatedAt: true,
             proveedor: {
               select: {
                 id: true,
@@ -34,7 +51,14 @@ export async function GET(
             ordenPreferencia: 'asc',
           },
         },
-        inventario: true,
+        inventario: {
+          select: {
+            id: true,
+            productoId: true,
+            stockActual: true,
+            ultimaActualizacion: true,
+          },
+        },
       },
     })
 
