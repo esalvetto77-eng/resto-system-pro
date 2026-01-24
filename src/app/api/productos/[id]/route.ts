@@ -15,53 +15,28 @@ export async function GET(
   try {
     console.log('[API PRODUCTO] Obteniendo producto:', params.id)
     
-    // Intentar consulta con todos los campos primero
-    let producto
-    try {
-      producto = await prisma.producto.findUnique({
-        where: { id: params.id },
-        include: {
-          proveedores: {
-            include: {
-              proveedor: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  contacto: true,
-                  telefono: true,
-                },
+    // Consulta básica - no especificar campos nuevos que pueden no existir
+    const producto = await prisma.producto.findUnique({
+      where: { id: params.id },
+      include: {
+        proveedores: {
+          include: {
+            proveedor: {
+              select: {
+                id: true,
+                nombre: true,
+                contacto: true,
+                telefono: true,
               },
             },
-            orderBy: {
-              ordenPreferencia: 'asc',
-            },
           },
-          inventario: true,
-        },
-      })
-    } catch (dbError: any) {
-      console.error('[API PRODUCTO] Error en consulta de BD:', dbError)
-      // Si falla por campos que no existen, intentar consulta básica
-      producto = await prisma.producto.findUnique({
-        where: { id: params.id },
-        include: {
-          proveedores: {
-            include: {
-              proveedor: {
-                select: {
-                  id: true,
-                  nombre: true,
-                },
-              },
-            },
-            orderBy: {
-              ordenPreferencia: 'asc',
-            },
+          orderBy: {
+            ordenPreferencia: 'asc',
           },
-          inventario: true,
         },
-      })
-    }
+        inventario: true,
+      },
+    })
 
     if (!producto) {
       console.log('[API PRODUCTO] Producto no encontrado:', params.id)
@@ -74,16 +49,28 @@ export async function GET(
     console.log('[API PRODUCTO] Producto encontrado:', producto.id, producto.nombre)
 
     // Asegurar que los campos nuevos tengan valores por defecto si son null (para productos antiguos)
+    // Usar hasOwnProperty para verificar si los campos existen antes de acceder
     const productoConDefaults = {
       ...producto,
-      proveedores: producto.proveedores.map((pp: any) => ({
-        ...pp,
-        moneda: pp.moneda || 'UYU',
-        precioEnDolares: pp.precioEnDolares ?? null,
-        precioEnPesos: pp.precioEnPesos ?? (pp.moneda === 'UYU' || !pp.moneda ? pp.precioCompra : null),
-        cotizacionUsada: pp.cotizacionUsada ?? null,
-        fechaCotizacion: pp.fechaCotizacion ?? null,
-      })),
+      proveedores: producto.proveedores.map((pp: any) => {
+        // Verificar si los campos nuevos existen, si no, usar valores por defecto
+        const moneda = pp.hasOwnProperty('moneda') ? (pp.moneda || 'UYU') : 'UYU'
+        const precioEnDolares = pp.hasOwnProperty('precioEnDolares') ? (pp.precioEnDolares ?? null) : null
+        const precioEnPesos = pp.hasOwnProperty('precioEnPesos') 
+          ? (pp.precioEnPesos ?? (moneda === 'UYU' ? pp.precioCompra : null))
+          : (moneda === 'UYU' ? pp.precioCompra : null)
+        const cotizacionUsada = pp.hasOwnProperty('cotizacionUsada') ? (pp.cotizacionUsada ?? null) : null
+        const fechaCotizacion = pp.hasOwnProperty('fechaCotizacion') ? (pp.fechaCotizacion ?? null) : null
+        
+        return {
+          ...pp,
+          moneda,
+          precioEnDolares,
+          precioEnPesos,
+          cotizacionUsada,
+          fechaCotizacion,
+        }
+      }),
     }
 
     console.log('[API PRODUCTO] Producto procesado, devolviendo respuesta')
