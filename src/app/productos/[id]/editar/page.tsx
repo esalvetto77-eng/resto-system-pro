@@ -206,13 +206,12 @@ export default function EditarProductoPage({
     setSaving(true)
 
     try {
-      // Preparar datos de proveedores sin campos de moneda (hasta que existan en BD)
+      // Preparar datos de proveedores con campos de moneda
       const proveedoresParaEnviar = proveedoresValidos.map((p) => ({
         proveedorId: p.proveedorId,
         precioCompra: p.precioCompra,
         ordenPreferencia: p.ordenPreferencia,
-        // No enviar moneda aún hasta que los campos existan en BD
-        // moneda: p.moneda,
+        moneda: p.moneda,
       }))
       
       console.log('[EDITAR PRODUCTO] Enviando datos:', {

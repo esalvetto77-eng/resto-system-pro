@@ -200,37 +200,82 @@ export async function PUT(
           }
           console.log('[API PRODUCTO PUT] Todos los proveedores validados')
 
-          // Crear datos básicos (solo campos que siempre existen en la BD)
+          // Obtener cotización actual del dólar si hay productos en USD
+          let cotizacionActual = null
+          const tieneProductosUSD = body.proveedores.some((p: any) => p.moneda === 'USD')
+          if (tieneProductosUSD) {
+            try {
+              const { obtenerCotizacionBROU } = await import('@/lib/utils')
+              const cotizacionData = await obtenerCotizacionBROU()
+              if (cotizacionData) {
+                cotizacionActual = (cotizacionData.compra + cotizacionData.venta) / 2
+              }
+            } catch (err) {
+              console.warn('[API PRODUCTO PUT] No se pudo obtener cotización:', err)
+            }
+          }
+          
+          // Crear datos con campos de moneda
           const datosProveedores = body.proveedores
             .filter((prov: any) => prov.proveedorId)
             .map((prov: any, index: number) => {
-              const datosBase = {
+              const precioCompra = toNumberOrNull(prov.precioCompra)
+              const moneda = prov.moneda || 'UYU'
+              let precioEnDolares = null
+              let precioEnPesos = null
+              
+              if (moneda === 'USD' && precioCompra) {
+                precioEnDolares = precioCompra
+                precioEnPesos = cotizacionActual ? precioCompra * cotizacionActual : null
+              } else if (moneda === 'UYU' && precioCompra) {
+                precioEnPesos = precioCompra
+              }
+              
+              return {
                 productoId: params.id,
                 proveedorId: prov.proveedorId,
-                precioCompra: toNumberOrNull(prov.precioCompra),
+                precioCompra,
                 ordenPreferencia: prov.ordenPreferencia || index + 1,
+                moneda,
+                precioEnDolares,
+                precioEnPesos,
+                cotizacionUsada: moneda === 'USD' ? cotizacionActual : null,
+                fechaCotizacion: moneda === 'USD' && cotizacionActual ? new Date() : null,
               }
-              console.log('[API PRODUCTO PUT] Datos proveedor:', datosBase)
-              return datosBase
             })
           
           console.log('[API PRODUCTO PUT] Creando', datosProveedores.length, 'relaciones de proveedores')
           
-          // Usar SQL directo para evitar que Prisma intente escribir campos que no existen
-          // Insertar cada proveedor individualmente para evitar problemas con campos opcionales
+          // Usar SQL directo para insertar con campos de moneda
           for (const datosProv of datosProveedores) {
             await tx.$executeRawUnsafe(`
-              INSERT INTO producto_proveedor (id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia", "createdAt", "updatedAt")
-              VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW(), NOW())
+              INSERT INTO producto_proveedor (
+                id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
+                "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
+                "createdAt", "updatedAt"
+              )
+              VALUES (
+                gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
+              )
               ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
                 "precioCompra" = EXCLUDED."precioCompra",
                 "ordenPreferencia" = EXCLUDED."ordenPreferencia",
+                "moneda" = EXCLUDED."moneda",
+                "precioEnDolares" = EXCLUDED."precioEnDolares",
+                "precioEnPesos" = EXCLUDED."precioEnPesos",
+                "cotizacionUsada" = EXCLUDED."cotizacionUsada",
+                "fechaCotizacion" = EXCLUDED."fechaCotizacion",
                 "updatedAt" = NOW()
             `,
               datosProv.productoId,
               datosProv.proveedorId,
               datosProv.precioCompra,
-              datosProv.ordenPreferencia
+              datosProv.ordenPreferencia,
+              datosProv.moneda,
+              datosProv.precioEnDolares,
+              datosProv.precioEnPesos,
+              datosProv.cotizacionUsada,
+              datosProv.fechaCotizacion
             )
           }
           

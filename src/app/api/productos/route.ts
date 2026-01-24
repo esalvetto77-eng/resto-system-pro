@@ -241,30 +241,80 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Crear relaciones de proveedores usando SQL directo para evitar campos que no existen
+        // Obtener cotización actual del dólar si hay productos en USD
+        let cotizacionActual = null
+        const tieneProductosUSD = body.proveedores.some((p: any) => p.moneda === 'USD')
+        if (tieneProductosUSD) {
+          try {
+            const { obtenerCotizacionBROU } = await import('@/lib/utils')
+            const cotizacionData = await obtenerCotizacionBROU()
+            if (cotizacionData) {
+              cotizacionActual = (cotizacionData.compra + cotizacionData.venta) / 2
+            }
+          } catch (err) {
+            console.warn('[API PRODUCTOS POST] No se pudo obtener cotización:', err)
+          }
+        }
+        
+        // Crear relaciones de proveedores con campos de moneda
         const proveedoresParaCrear = body.proveedores
           .filter((prov: any) => prov.proveedorId)
-          .map((prov: any, index: number) => ({
-            productoId: nuevoProducto.id,
-            proveedorId: prov.proveedorId,
-            precioCompra: toNumberOrNull(prov.precioCompra),
-            ordenPreferencia: prov.ordenPreferencia || index + 1,
-          }))
+          .map((prov: any, index: number) => {
+            const precioCompra = toNumberOrNull(prov.precioCompra)
+            const moneda = prov.moneda || 'UYU'
+            let precioEnDolares = null
+            let precioEnPesos = null
+            
+            if (moneda === 'USD' && precioCompra) {
+              precioEnDolares = precioCompra
+              precioEnPesos = cotizacionActual ? precioCompra * cotizacionActual : null
+            } else if (moneda === 'UYU' && precioCompra) {
+              precioEnPesos = precioCompra
+            }
+            
+            return {
+              productoId: nuevoProducto.id,
+              proveedorId: prov.proveedorId,
+              precioCompra,
+              ordenPreferencia: prov.ordenPreferencia || index + 1,
+              moneda,
+              precioEnDolares,
+              precioEnPesos,
+              cotizacionUsada: moneda === 'USD' ? cotizacionActual : null,
+              fechaCotizacion: moneda === 'USD' && cotizacionActual ? new Date() : null,
+            }
+          })
         
-        // Insertar cada proveedor usando SQL directo
+        // Insertar cada proveedor usando SQL directo con campos de moneda
         for (const datosProv of proveedoresParaCrear) {
           await tx.$executeRawUnsafe(`
-            INSERT INTO producto_proveedor (id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia", "createdAt", "updatedAt")
-            VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW(), NOW())
+            INSERT INTO producto_proveedor (
+              id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
+              "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
+              "createdAt", "updatedAt"
+            )
+            VALUES (
+              gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
+            )
             ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
               "precioCompra" = EXCLUDED."precioCompra",
               "ordenPreferencia" = EXCLUDED."ordenPreferencia",
+              "moneda" = EXCLUDED."moneda",
+              "precioEnDolares" = EXCLUDED."precioEnDolares",
+              "precioEnPesos" = EXCLUDED."precioEnPesos",
+              "cotizacionUsada" = EXCLUDED."cotizacionUsada",
+              "fechaCotizacion" = EXCLUDED."fechaCotizacion",
               "updatedAt" = NOW()
           `,
             datosProv.productoId,
             datosProv.proveedorId,
             datosProv.precioCompra,
-            datosProv.ordenPreferencia
+            datosProv.ordenPreferencia,
+            datosProv.moneda,
+            datosProv.precioEnDolares,
+            datosProv.precioEnPesos,
+            datosProv.cotizacionUsada,
+            datosProv.fechaCotizacion
           )
         }
       }
