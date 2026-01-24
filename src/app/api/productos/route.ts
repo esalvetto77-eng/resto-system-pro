@@ -115,8 +115,13 @@ export async function GET(request: NextRequest) {
           }
         })
       } catch (error: any) {
-        console.log('[API PRODUCTOS] Campos de moneda no disponibles en BD:', error?.message)
-        console.log('[API PRODUCTOS] Error completo:', error)
+        // Si los campos no existen, es normal - el usuario necesita ejecutar npx prisma db push
+        if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
+          console.log('[API PRODUCTOS] Campos de moneda no existen en BD. Ejecuta: npx prisma db push')
+        } else {
+          console.log('[API PRODUCTOS] Error al leer campos de moneda:', error?.message)
+          console.log('[API PRODUCTOS] Error completo:', error)
+        }
       }
     }
     
