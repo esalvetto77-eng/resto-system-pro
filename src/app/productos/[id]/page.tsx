@@ -8,9 +8,26 @@ export const dynamic = 'force-dynamic'
 async function getProducto(id: string) {
   return await prisma.producto.findUnique({
     where: { id },
-    include: {
+    select: {
+      id: true,
+      nombre: true,
+      codigo: true,
+      descripcion: true,
+      unidad: true,
+      stockMinimo: true,
+      rubro: true,
+      activo: true,
+      createdAt: true,
+      updatedAt: true,
       proveedores: {
-        include: {
+        select: {
+          id: true,
+          productoId: true,
+          proveedorId: true,
+          precioCompra: true,
+          ordenPreferencia: true,
+          createdAt: true,
+          updatedAt: true,
           proveedor: {
             select: {
               id: true,
@@ -24,7 +41,14 @@ async function getProducto(id: string) {
           ordenPreferencia: 'asc',
         },
       },
-      inventario: true,
+      inventario: {
+        select: {
+          id: true,
+          productoId: true,
+          stockActual: true,
+          ultimaActualizacion: true,
+        },
+      },
     },
   })
 }
