@@ -193,12 +193,29 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Retornar producto con proveedores e inventario
+      // Retornar producto con proveedores e inventario usando select explícito
       return await tx.producto.findUnique({
         where: { id: nuevoProducto.id },
-        include: {
+        select: {
+          id: true,
+          nombre: true,
+          codigo: true,
+          descripcion: true,
+          unidad: true,
+          stockMinimo: true,
+          rubro: true,
+          activo: true,
+          createdAt: true,
+          updatedAt: true,
           proveedores: {
-            include: {
+            select: {
+              id: true,
+              productoId: true,
+              proveedorId: true,
+              precioCompra: true,
+              ordenPreferencia: true,
+              createdAt: true,
+              updatedAt: true,
               proveedor: {
                 select: {
                   id: true,
@@ -210,7 +227,14 @@ export async function POST(request: NextRequest) {
               ordenPreferencia: 'asc',
             },
           },
-          inventario: true,
+          inventario: {
+            select: {
+              id: true,
+              productoId: true,
+              stockActual: true,
+              ultimaActualizacion: true,
+            },
+          },
         },
       })
     })
