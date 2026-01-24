@@ -276,31 +276,37 @@ export default function ProductosPage() {
                                   
                                   return (
                                     <div key={pp.id} className="text-sm">
-                                      <div className={isCheapest ? 'font-medium text-terracotta-700' : 'text-neutral-600'}>
-                                        {moneda === 'USD' ? (
-                                          <>
-                                            <ProtectedPrice
-                                              value={pp.precioCompra}
-                                              formatter={(v) => `$${v?.toFixed(2) || '0.00'} USD`}
-                                              fallback={<span className="text-neutral-400">-</span>}
-                                            />
-                                            {precioEnPesos && (
-                                              <div className="text-xs text-neutral-500 mt-0.5">
-                                                ≈ {formatCurrency(precioEnPesos)} UYU
-                                              </div>
-                                            )}
-                                          </>
-                                        ) : (
-                                          <ProtectedPrice
-                                            value={pp.precioCompra}
-                                            formatter={formatCurrency}
-                                            fallback={<span className="text-neutral-400">-</span>}
-                                          />
+                                      <div className="flex items-center gap-2">
+                                        <div className={isCheapest ? 'font-medium text-terracotta-700' : 'text-neutral-600'}>
+                                          {moneda === 'USD' ? (
+                                            <>
+                                              <ProtectedPrice
+                                                value={pp.precioCompra}
+                                                formatter={(v) => `$${v?.toFixed(2) || '0.00'}`}
+                                                fallback={<span className="text-neutral-400">-</span>}
+                                              />
+                                              <Badge variant="primary" className="ml-1 text-xs">USD</Badge>
+                                              {precioEnPesos && (
+                                                <div className="text-xs text-neutral-500 mt-0.5">
+                                                  ≈ {formatCurrency(precioEnPesos)} UYU
+                                                </div>
+                                              )}
+                                            </>
+                                          ) : (
+                                            <>
+                                              <ProtectedPrice
+                                                value={pp.precioCompra}
+                                                formatter={formatCurrency}
+                                                fallback={<span className="text-neutral-400">-</span>}
+                                              />
+                                              <Badge variant="neutral" className="ml-1 text-xs">UYU</Badge>
+                                            </>
+                                          )}
+                                        </div>
+                                        {isCheapest && canSeePrices() && (
+                                          <span className="text-xs text-terracotta-600">↓</span>
                                         )}
                                       </div>
-                                      {isCheapest && canSeePrices() && (
-                                        <span className="ml-1 text-xs text-terracotta-600">↓</span>
-                                      )}
                                     </div>
                                   )
                                 })}

@@ -67,6 +67,63 @@ export async function GET(request: NextRequest) {
     })
     console.log('[API PRODUCTOS] Productos encontrados:', productos.length)
     
+    // Intentar leer campos de moneda usando SQL directo si existen
+    const proveedorIds = productos
+      .flatMap(p => p.proveedores.map(pp => pp.id))
+      .filter((id): id is string => id !== undefined)
+    
+    let monedaData: Record<string, any> = {}
+    
+    if (proveedorIds.length > 0) {
+      try {
+        const idsList = proveedorIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',')
+        const query = `
+          SELECT 
+            id,
+            "moneda",
+            "precioEnDolares",
+            "precioEnPesos",
+            "cotizacionUsada",
+            "fechaCotizacion"
+          FROM "producto_proveedor"
+          WHERE id IN (${idsList})
+        `
+        const result = await prisma.$queryRawUnsafe<Array<{
+          id: string
+          moneda?: string | null
+          precioEnDolares?: number | null
+          precioEnPesos?: number | null
+          cotizacionUsada?: number | null
+          fechaCotizacion?: Date | null
+        }>>(query)
+        
+        result.forEach((row) => {
+          monedaData[row.id] = {
+            moneda: row.moneda || null,
+            precioEnDolares: row.precioEnDolares || null,
+            precioEnPesos: row.precioEnPesos || null,
+            cotizacionUsada: row.cotizacionUsada || null,
+            fechaCotizacion: row.fechaCotizacion ? row.fechaCotizacion.toISOString() : null,
+          }
+        })
+      } catch (error: any) {
+        console.log('[API PRODUCTOS] Campos de moneda no disponibles en BD:', error?.message)
+      }
+    }
+    
+    // Agregar información de moneda a cada proveedor
+    const productosConMoneda = productos.map(producto => ({
+      ...producto,
+      proveedores: producto.proveedores.map(pp => ({
+        ...pp,
+        moneda: monedaData[pp.id]?.moneda || null,
+        precioEnDolares: monedaData[pp.id]?.precioEnDolares || null,
+        precioEnPesos: monedaData[pp.id]?.precioEnPesos || null,
+        cotizacionUsada: monedaData[pp.id]?.cotizacionUsada || null,
+        fechaCotizacion: monedaData[pp.id]?.fechaCotizacion || null,
+      })),
+    }))
+    
     console.log('[API PRODUCTOS] Primer producto (ejemplo):', productos[0] ? {
       id: productos[0].id,
       nombre: productos[0].nombre,
@@ -74,10 +131,8 @@ export async function GET(request: NextRequest) {
       proveedoresCount: productos[0].proveedores?.length || 0,
     } : 'No hay productos')
     
-    // Los campos de moneda se leerán desde SQL directo si existen
-    // Por ahora, devolver los productos tal como están (sin campos de moneda)
-    console.log('[API PRODUCTOS] Devolviendo productos:', productos.length)
-    return NextResponse.json(productos)
+    console.log('[API PRODUCTOS] Devolviendo productos:', productosConMoneda.length)
+    return NextResponse.json(productosConMoneda)
   } catch (error: any) {
     console.error('[API PRODUCTOS] Error completo:', error)
     console.error('[API PRODUCTOS] Error message:', error?.message || String(error))
