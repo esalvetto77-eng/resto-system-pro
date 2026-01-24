@@ -160,6 +160,24 @@ export async function PUT(
     console.log('[API PRODUCTO PUT] Iniciando actualización de producto:', params.id)
     console.log('[API PRODUCTO PUT] Body recibido:', JSON.stringify(body, null, 2))
     
+    // Verificar si los campos de moneda existen ANTES de la transacción
+    let camposMonedaExisten = false
+    try {
+      // Intentar una consulta simple para verificar si los campos existen
+      await prisma.$queryRawUnsafe(`SELECT "moneda" FROM "producto_proveedor" LIMIT 1`)
+      camposMonedaExisten = true
+      console.log('[API PRODUCTO PUT] Campos de moneda existen en BD')
+    } catch (error: any) {
+      if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
+        console.log('[API PRODUCTO PUT] Campos de moneda NO existen en BD, usando solo campos básicos')
+        camposMonedaExisten = false
+      } else {
+        // Si es otro error, asumir que los campos no existen por seguridad
+        console.log('[API PRODUCTO PUT] No se pudo verificar campos de moneda, usando solo campos básicos')
+        camposMonedaExisten = false
+      }
+    }
+    
     // Actualizar producto usando transacción
     const producto = await prisma.$transaction(async (tx) => {
       // Actualizar datos básicos del producto
@@ -246,25 +264,7 @@ export async function PUT(
           
           console.log('[API PRODUCTO PUT] Creando', datosProveedores.length, 'relaciones de proveedores')
           
-          // Verificar si los campos de moneda existen antes de intentar usarlos
-          let camposMonedaExisten = false
-          try {
-            // Intentar una consulta simple para verificar si los campos existen
-            await tx.$queryRawUnsafe(`SELECT "moneda" FROM "producto_proveedor" LIMIT 1`)
-            camposMonedaExisten = true
-            console.log('[API PRODUCTO PUT] Campos de moneda existen en BD')
-          } catch (error: any) {
-            if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
-              console.log('[API PRODUCTO PUT] Campos de moneda NO existen en BD, usando solo campos básicos')
-              camposMonedaExisten = false
-            } else {
-              // Si es otro error, asumir que los campos no existen por seguridad
-              console.log('[API PRODUCTO PUT] No se pudo verificar campos de moneda, usando solo campos básicos')
-              camposMonedaExisten = false
-            }
-          }
-          
-          // Insertar proveedores según si los campos existen o no
+          // Insertar proveedores según si los campos existen o no (verificado antes de la transacción)
           for (const datosProv of datosProveedores) {
             if (camposMonedaExisten) {
               // Insertar con campos de moneda
