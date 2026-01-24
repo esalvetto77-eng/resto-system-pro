@@ -206,12 +206,26 @@ export default function EditarProductoPage({
     setSaving(true)
 
     try {
+      // Preparar datos de proveedores sin campos de moneda (hasta que existan en BD)
+      const proveedoresParaEnviar = proveedoresValidos.map((p) => ({
+        proveedorId: p.proveedorId,
+        precioCompra: p.precioCompra,
+        ordenPreferencia: p.ordenPreferencia,
+        // No enviar moneda aún hasta que los campos existan en BD
+        // moneda: p.moneda,
+      }))
+      
+      console.log('[EDITAR PRODUCTO] Enviando datos:', {
+        ...formData,
+        proveedores: proveedoresParaEnviar,
+      })
+      
       const response = await fetch(`/api/productos/${params.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          proveedores: proveedoresValidos,
+          proveedores: proveedoresParaEnviar,
         }),
       })
 
