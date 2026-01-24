@@ -9,12 +9,30 @@ export const dynamic = 'force-dynamic'
 // GET: Listar todo el inventario
 export async function GET() {
   try {
+    console.log('[API INVENTARIO] Obteniendo inventario...')
+    
+    // Usar select explícito para evitar leer campos que no existen
     const inventario = await prisma.inventario.findMany({
-      include: {
+      select: {
+        id: true,
+        productoId: true,
+        stockActual: true,
+        ultimaActualizacion: true,
         producto: {
-          include: {
+          select: {
+            id: true,
+            nombre: true,
+            codigo: true,
+            unidad: true,
+            stockMinimo: true,
+            rubro: true,
             proveedores: {
-              include: {
+              select: {
+                id: true,
+                productoId: true,
+                proveedorId: true,
+                precioCompra: true,
+                ordenPreferencia: true,
                 proveedor: {
                   select: {
                     id: true,
@@ -36,6 +54,8 @@ export async function GET() {
         },
       },
     })
+    
+    console.log('[API INVENTARIO] Items encontrados:', inventario.length)
 
     // Transformar la respuesta para que coincida con lo que espera el frontend
     const inventarioTransformado = inventario.map((item) => {
