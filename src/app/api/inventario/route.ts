@@ -33,12 +33,6 @@ export async function GET() {
                 proveedorId: true,
                 precioCompra: true,
                 ordenPreferencia: true,
-                // Intentar incluir campos de moneda si existen (pueden ser null)
-                moneda: true,
-                precioEnDolares: true,
-                precioEnPesos: true,
-                cotizacionUsada: true,
-                fechaCotizacion: true,
                 proveedor: {
                   select: {
                     id: true,
@@ -104,12 +98,6 @@ export async function GET() {
                   proveedorId: true,
                   precioCompra: true,
                   ordenPreferencia: true,
-                  // Intentar incluir campos de moneda si existen (pueden ser null)
-                  moneda: true,
-                  precioEnDolares: true,
-                  precioEnPesos: true,
-                  cotizacionUsada: true,
-                  fechaCotizacion: true,
                   proveedor: {
                     select: {
                       id: true,
@@ -153,12 +141,13 @@ export async function GET() {
           precioCompra: primerProveedor?.precioCompra || null,
           rubro: item.producto.rubro,
           proveedor: primerProveedor?.proveedor || null,
-          // Incluir información de moneda si existe
-          moneda: primerProveedor?.moneda || null,
-          precioEnDolares: primerProveedor?.precioEnDolares || null,
-          precioEnPesos: primerProveedor?.precioEnPesos || null,
-          cotizacionUsada: primerProveedor?.cotizacionUsada || null,
-          fechaCotizacion: primerProveedor?.fechaCotizacion?.toISOString() || null,
+          // Campos de moneda (solo se incluyen si existen en la BD)
+          // Se intentarán leer desde la BD usando SQL directo si es necesario
+          moneda: null,
+          precioEnDolares: null,
+          precioEnPesos: null,
+          cotizacionUsada: null,
+          fechaCotizacion: null,
         },
       }
     })
