@@ -97,6 +97,7 @@ export async function GET(request: NextRequest) {
           fechaCotizacion?: Date | null
         }>>(query)
         
+        console.log('[API PRODUCTOS] Resultados de moneda:', result.length, 'registros encontrados')
         result.forEach((row) => {
           monedaData[row.id] = {
             moneda: row.moneda || null,
@@ -105,23 +106,42 @@ export async function GET(request: NextRequest) {
             cotizacionUsada: row.cotizacionUsada || null,
             fechaCotizacion: row.fechaCotizacion ? row.fechaCotizacion.toISOString() : null,
           }
+          if (row.moneda === 'USD' || row.precioEnDolares) {
+            console.log('[API PRODUCTOS] Producto en USD encontrado:', row.id, {
+              moneda: row.moneda,
+              precioEnDolares: row.precioEnDolares,
+              precioEnPesos: row.precioEnPesos
+            })
+          }
         })
       } catch (error: any) {
         console.log('[API PRODUCTOS] Campos de moneda no disponibles en BD:', error?.message)
+        console.log('[API PRODUCTOS] Error completo:', error)
       }
     }
     
     // Agregar información de moneda a cada proveedor
     const productosConMoneda = productos.map(producto => ({
       ...producto,
-      proveedores: producto.proveedores.map(pp => ({
-        ...pp,
-        moneda: monedaData[pp.id]?.moneda || null,
-        precioEnDolares: monedaData[pp.id]?.precioEnDolares || null,
-        precioEnPesos: monedaData[pp.id]?.precioEnPesos || null,
-        cotizacionUsada: monedaData[pp.id]?.cotizacionUsada || null,
-        fechaCotizacion: monedaData[pp.id]?.fechaCotizacion || null,
-      })),
+      proveedores: producto.proveedores.map(pp => {
+        const datosMoneda = monedaData[pp.id] || {}
+        const monedaFinal = datosMoneda.moneda || null
+        const precioEnDolaresFinal = datosMoneda.precioEnDolares || null
+        
+        // Log para debugging
+        if (monedaFinal === 'USD' || precioEnDolaresFinal) {
+          console.log('[API PRODUCTOS] Producto', producto.nombre, '- Proveedor', pp.proveedor.nombre, '- Moneda:', monedaFinal, 'Precio USD:', precioEnDolaresFinal)
+        }
+        
+        return {
+          ...pp,
+          moneda: monedaFinal,
+          precioEnDolares: precioEnDolaresFinal,
+          precioEnPesos: datosMoneda.precioEnPesos || null,
+          cotizacionUsada: datosMoneda.cotizacionUsada || null,
+          fechaCotizacion: datosMoneda.fechaCotizacion || null,
+        }
+      }),
     }))
     
     console.log('[API PRODUCTOS] Primer producto (ejemplo):', productos[0] ? {

@@ -55,6 +55,23 @@ export default function ProductosPage() {
         console.log('Productos recibidos:', data)
         console.log('Es array?', Array.isArray(data))
         console.log('Cantidad de productos:', Array.isArray(data) ? data.length : 0)
+        
+        // Log para debugging de moneda
+        if (Array.isArray(data)) {
+          data.forEach((producto: any) => {
+            producto.proveedores?.forEach((pp: any) => {
+              if (pp.moneda === 'USD' || pp.precioEnDolares) {
+                console.log('[PRODUCTOS] Producto en USD:', producto.nombre, {
+                  proveedor: pp.proveedor?.nombre,
+                  moneda: pp.moneda,
+                  precioEnDolares: pp.precioEnDolares,
+                  precioCompra: pp.precioCompra
+                })
+              }
+            })
+          })
+        }
+        
         setProductos(Array.isArray(data) ? data : [])
       } catch (error) {
         console.error('Error al cargar productos:', error)
