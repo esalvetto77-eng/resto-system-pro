@@ -140,33 +140,48 @@ export default function InventarioPage() {
   }, [inventario, filtroRubro])
 
   // Calcular totales y productos en reposición
-  // Convertir todos los precios a UYU antes de sumar
-  const { totalesPorProducto, totalGeneral, productosReposicion } = useMemo(() => {
-    let totalGeneral = 0
+  // Separar totales por moneda: UYU y USD
+  const { totalesPorProducto, totalUYU, totalUSD, productosReposicion } = useMemo(() => {
+    let totalUYU = 0
+    let totalUSD = 0
     const productosReposicion: InventarioItem[] = []
     const totalesPorProducto = inventarioFiltrado.map((item) => {
-      // Determinar el precio en UYU
+      // Determinar si el producto está en USD o UYU
+      // Prioridad: 1) campo moneda, 2) precioEnDolares existe, 3) por defecto UYU
+      const esUSD = item.producto.moneda === 'USD' || 
+                    (item.producto.precioEnDolares !== null && item.producto.precioEnDolares !== undefined)
+      
       let precioEnUYU = 0
+      let precioEnUSD = 0
       
-      // Si tiene precioEnPesos (ya convertido), usarlo
-      if (item.producto.precioEnPesos !== null && item.producto.precioEnPesos !== undefined) {
-        precioEnUYU = item.producto.precioEnPesos
+      if (esUSD) {
+        // Producto en USD
+        if (item.producto.precioEnDolares !== null && item.producto.precioEnDolares !== undefined) {
+          precioEnUSD = item.producto.precioEnDolares
+        } else if (item.producto.precioCompra) {
+          precioEnUSD = item.producto.precioCompra
+        }
+        
+        // Calcular total en USD (sin convertir)
+        const total = precioEnUSD * item.stockActual
+        totalUSD += total
+        
+        // También calcular precio en UYU para mostrar
+        if (cotizacionDolar) {
+          precioEnUYU = precioEnUSD * cotizacionDolar
+        }
+      } else {
+        // Producto en UYU
+        if (item.producto.precioEnPesos !== null && item.producto.precioEnPesos !== undefined) {
+          precioEnUYU = item.producto.precioEnPesos
+        } else if (item.producto.precioCompra) {
+          precioEnUYU = item.producto.precioCompra
+        }
+        
+        // Calcular total en UYU
+        const total = precioEnUYU * item.stockActual
+        totalUYU += total
       }
-      // Si tiene precioEnDolares y cotización disponible, convertir
-      else if (item.producto.precioEnDolares !== null && item.producto.precioEnDolares !== undefined && cotizacionDolar) {
-        precioEnUYU = item.producto.precioEnDolares * cotizacionDolar
-      }
-      // Si tiene moneda = 'USD' y precioCompra, convertir usando cotización actual
-      else if (item.producto.moneda === 'USD' && item.producto.precioCompra && cotizacionDolar) {
-        precioEnUYU = item.producto.precioCompra * cotizacionDolar
-      }
-      // Si tiene precioCompra y no es USD, asumir que ya está en UYU
-      else if (item.producto.precioCompra) {
-        precioEnUYU = item.producto.precioCompra
-      }
-      
-      const total = precioEnUYU * item.stockActual
-      totalGeneral += total
       
       if (calcularEstadoInventario(item.stockActual, item.producto.stockMinimo) === 'REPOSICION') {
         productosReposicion.push(item)
@@ -174,11 +189,13 @@ export default function InventarioPage() {
       
       return {
         ...item,
-        total,
-        precioEnUYU, // Guardar el precio convertido para mostrar
+        total: esUSD ? precioEnUSD * item.stockActual : precioEnUYU * item.stockActual,
+        precioEnUYU,
+        precioEnUSD,
+        esUSD,
       }
     })
-    return { totalesPorProducto, totalGeneral, productosReposicion }
+    return { totalesPorProducto, totalUYU, totalUSD, productosReposicion }
   }, [inventarioFiltrado, cotizacionDolar])
 
   if (loading) {
@@ -231,17 +248,38 @@ export default function InventarioPage() {
           </CardBody>
         </Card>
 
-        <Card className="bg-terracotta-50 border-terracotta-200">
-          <CardBody className="text-center py-8">
-            <div className="text-sm text-terracotta-700 mb-2 font-medium">Total del Inventario</div>
-            <ProtectedPrice
-              value={totalGeneral}
-              formatter={formatCurrency}
-              fallback={<span className="text-3xl font-semibold text-neutral-400">-</span>}
-              className="text-3xl font-semibold text-terracotta-900"
-            />
-          </CardBody>
-        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="bg-terracotta-50 border-terracotta-200">
+            <CardBody className="text-center py-6">
+              <div className="text-sm text-terracotta-700 mb-2 font-medium">Total en Pesos (UYU)</div>
+              <ProtectedPrice
+                value={totalUYU}
+                formatter={formatCurrency}
+                fallback={<span className="text-2xl font-semibold text-neutral-400">-</span>}
+                className="text-2xl font-semibold text-terracotta-900"
+              />
+            </CardBody>
+          </Card>
+          <Card className="bg-blue-50 border-blue-200">
+            <CardBody className="text-center py-6">
+              <div className="text-sm text-blue-700 mb-2 font-medium">Total en Dólares (USD)</div>
+              <div className="text-2xl font-semibold text-blue-900">
+                {totalUSD > 0 ? (
+                  <>
+                    ${totalUSD.toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                    {cotizacionDolar && (
+                      <div className="text-xs text-blue-600 mt-1 font-normal">
+                        ≈ {formatCurrency(totalUSD * cotizacionDolar)} UYU
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-neutral-400">-</span>
+                )}
+              </div>
+            </CardBody>
+          </Card>
+        </div>
       </div>
 
       {/* Alerta de Reposición - Minimalista */}
