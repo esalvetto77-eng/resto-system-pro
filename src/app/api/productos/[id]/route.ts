@@ -205,39 +205,50 @@ export async function PUT(
             console.warn('No se pudo obtener cotización, se guardará sin conversión:', err)
           }
 
-          await tx.productoProveedor.createMany({
-            data: body.proveedores
-              .filter((prov: any) => prov.proveedorId)
-              .map((prov: any, index: number) => {
-                const precio = toNumberOrNull(prov.precioCompra)
-                const moneda = prov.moneda || 'UYU'
-                
-                // Calcular precios según la moneda
-                let precioEnDolares = null
-                let precioEnPesos = null
-                
-                if (precio) {
-                  if (moneda === 'USD') {
-                    precioEnDolares = precio
-                    precioEnPesos = cotizacionActual ? precio * cotizacionActual : null
-                  } else {
-                    precioEnPesos = precio
-                    precioEnDolares = cotizacionActual ? precio / cotizacionActual : null
+          // Crear datos básicos primero (sin campos nuevos que pueden no existir)
+          const datosProveedores = body.proveedores
+            .filter((prov: any) => prov.proveedorId)
+            .map((prov: any, index: number) => {
+              const precio = toNumberOrNull(prov.precioCompra)
+              const moneda = prov.moneda || 'UYU'
+              
+              // Datos básicos que siempre existen
+              const datosBase: any = {
+                productoId: params.id,
+                proveedorId: prov.proveedorId,
+                precioCompra: precio,
+                ordenPreferencia: prov.ordenPreferencia || index + 1,
+              }
+              
+              // Solo agregar campos nuevos si la moneda es USD y tenemos cotización
+              // Si los campos no existen en la BD, Prisma los ignorará
+              try {
+                if (precio && moneda === 'USD' && cotizacionActual) {
+                  datosBase.moneda = moneda
+                  datosBase.precioEnDolares = precio
+                  datosBase.precioEnPesos = precio * cotizacionActual
+                  datosBase.cotizacionUsada = cotizacionActual
+                  datosBase.fechaCotizacion = new Date()
+                } else if (precio && moneda === 'UYU') {
+                  datosBase.moneda = moneda
+                  datosBase.precioEnPesos = precio
+                  if (cotizacionActual) {
+                    datosBase.precioEnDolares = precio / cotizacionActual
+                    datosBase.cotizacionUsada = cotizacionActual
+                    datosBase.fechaCotizacion = new Date()
                   }
                 }
-                
-                return {
-                  productoId: params.id,
-                  proveedorId: prov.proveedorId,
-                  precioCompra: precio,
-                  moneda: moneda,
-                  precioEnDolares: precioEnDolares,
-                  precioEnPesos: precioEnPesos,
-                  cotizacionUsada: cotizacionActual,
-                  fechaCotizacion: cotizacionActual ? new Date() : null,
-                  ordenPreferencia: prov.ordenPreferencia || index + 1,
-                }
-              }),
+              } catch (err) {
+                // Si falla al agregar campos nuevos, continuar con datos básicos
+                console.warn('[API PRODUCTO] No se pudieron agregar campos de moneda:', err)
+              }
+              
+              return datosBase
+            })
+          
+          await tx.productoProveedor.createMany({
+            data: datosProveedores,
+            skipDuplicates: true,
           })
         }
       }
