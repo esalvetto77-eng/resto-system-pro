@@ -26,6 +26,12 @@ interface InventarioItem {
       id: string
       nombre: string
     } | null
+    // Campos de moneda (pueden ser null si no existen en la BD)
+    moneda?: string | null
+    precioEnDolares?: number | null
+    precioEnPesos?: number | null
+    cotizacionUsada?: number | null
+    fechaCotizacion?: string | null
   }
 }
 
@@ -36,10 +42,27 @@ export default function InventarioPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<number>(0)
   const [filtroRubro, setFiltroRubro] = useState<string>('')
+  const [cotizacionDolar, setCotizacionDolar] = useState<number | null>(null)
 
   useEffect(() => {
     fetchInventario()
+    fetchCotizacionDolar()
   }, [])
+
+  async function fetchCotizacionDolar() {
+    try {
+      const response = await fetch('/api/cotizacion-dolar')
+      if (response.ok) {
+        const data = await response.json()
+        // Usar el promedio de compra y venta como cotización
+        if (data?.compra && data?.venta) {
+          setCotizacionDolar((data.compra + data.venta) / 2)
+        }
+      }
+    } catch (error) {
+      console.error('Error al obtener cotización del dólar:', error)
+    }
+  }
 
   async function fetchInventario() {
     try {
@@ -117,12 +140,32 @@ export default function InventarioPage() {
   }, [inventario, filtroRubro])
 
   // Calcular totales y productos en reposición
+  // Convertir todos los precios a UYU antes de sumar
   const { totalesPorProducto, totalGeneral, productosReposicion } = useMemo(() => {
     let totalGeneral = 0
     const productosReposicion: InventarioItem[] = []
     const totalesPorProducto = inventarioFiltrado.map((item) => {
-      const precio = item.producto.precioCompra || 0
-      const total = precio * item.stockActual
+      // Determinar el precio en UYU
+      let precioEnUYU = 0
+      
+      // Si tiene precioEnPesos (ya convertido), usarlo
+      if (item.producto.precioEnPesos !== null && item.producto.precioEnPesos !== undefined) {
+        precioEnUYU = item.producto.precioEnPesos
+      }
+      // Si tiene precioEnDolares y cotización disponible, convertir
+      else if (item.producto.precioEnDolares !== null && item.producto.precioEnDolares !== undefined && cotizacionDolar) {
+        precioEnUYU = item.producto.precioEnDolares * cotizacionDolar
+      }
+      // Si tiene moneda = 'USD' y precioCompra, convertir usando cotización actual
+      else if (item.producto.moneda === 'USD' && item.producto.precioCompra && cotizacionDolar) {
+        precioEnUYU = item.producto.precioCompra * cotizacionDolar
+      }
+      // Si tiene precioCompra y no es USD, asumir que ya está en UYU
+      else if (item.producto.precioCompra) {
+        precioEnUYU = item.producto.precioCompra
+      }
+      
+      const total = precioEnUYU * item.stockActual
       totalGeneral += total
       
       if (calcularEstadoInventario(item.stockActual, item.producto.stockMinimo) === 'REPOSICION') {
@@ -132,10 +175,11 @@ export default function InventarioPage() {
       return {
         ...item,
         total,
+        precioEnUYU, // Guardar el precio convertido para mostrar
       }
     })
     return { totalesPorProducto, totalGeneral, productosReposicion }
-  }, [inventarioFiltrado])
+  }, [inventarioFiltrado, cotizacionDolar])
 
   if (loading) {
     return (
@@ -333,11 +377,16 @@ export default function InventarioPage() {
                       {canEdit() && (
                         <TableCell>
                           <ProtectedPrice
-                            value={item.producto.precioCompra}
+                            value={(item as any).precioEnUYU || item.producto.precioCompra}
                             formatter={formatCurrency}
                             fallback={<span className="text-neutral-400">-</span>}
                             className="text-neutral-600"
                           />
+                          {item.producto.moneda === 'USD' && (
+                            <div className="text-xs text-neutral-500 mt-1">
+                              ({item.producto.precioEnDolares || item.producto.precioCompra} USD)
+                            </div>
+                          )}
                         </TableCell>
                       )}
                       {canEdit() && (
