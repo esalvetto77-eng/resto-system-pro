@@ -157,6 +157,9 @@ export async function PUT(
       return null
     }
 
+    console.log('[API PRODUCTO PUT] Iniciando actualización de producto:', params.id)
+    console.log('[API PRODUCTO PUT] Body recibido:', JSON.stringify(body, null, 2))
+    
     // Actualizar producto usando transacción
     const producto = await prisma.$transaction(async (tx) => {
       // Actualizar datos básicos del producto
@@ -175,10 +178,13 @@ export async function PUT(
 
       // Si se proporcionan proveedores, actualizar relaciones
       if (body.proveedores !== undefined && Array.isArray(body.proveedores)) {
+        console.log('[API PRODUCTO PUT] Actualizando proveedores, cantidad:', body.proveedores.length)
+        
         // Eliminar relaciones existentes
         await tx.productoProveedor.deleteMany({
           where: { productoId: params.id },
         })
+        console.log('[API PRODUCTO PUT] Relaciones anteriores eliminadas')
 
         // Crear nuevas relaciones
         if (body.proveedores.length > 0) {
@@ -192,64 +198,28 @@ export async function PUT(
               throw new Error(`Proveedor ${prov.proveedorId} no encontrado`)
             }
           }
-
-          // Obtener cotización actual del dólar
-          let cotizacionActual = null
-          try {
-            const { obtenerCotizacionBROU } = await import('@/lib/utils')
-            const cotizacionData = await obtenerCotizacionBROU()
-            if (cotizacionData) {
-              cotizacionActual = (cotizacionData.compra + cotizacionData.venta) / 2
-            }
-          } catch (err) {
-            console.warn('No se pudo obtener cotización, se guardará sin conversión:', err)
-          }
+          console.log('[API PRODUCTO PUT] Todos los proveedores validados')
 
           // Crear datos básicos (solo campos que siempre existen en la BD)
-          // No incluir campos de moneda que pueden no existir aún
           const datosProveedores = body.proveedores
             .filter((prov: any) => prov.proveedorId)
             .map((prov: any, index: number) => {
-              const datosBase: any = {
+              const datosBase = {
                 productoId: params.id,
                 proveedorId: prov.proveedorId,
                 precioCompra: toNumberOrNull(prov.precioCompra),
                 ordenPreferencia: prov.ordenPreferencia || index + 1,
               }
-              
-              // Solo agregar campos de moneda si están presentes y tenemos cotización
-              // Si los campos no existen en la BD, Prisma los ignorará o fallará
-              // Por ahora, solo guardamos los campos básicos hasta que se agreguen a la BD
-              if (prov.moneda && cotizacionActual) {
-                const precio = toNumberOrNull(prov.precioCompra)
-                if (precio) {
-                  try {
-                    // Intentar agregar campos de moneda solo si están en el schema
-                    // Si no existen, Prisma fallará, así que los omitimos por ahora
-                    // datosBase.moneda = prov.moneda
-                    // if (prov.moneda === 'USD') {
-                    //   datosBase.precioEnDolares = precio
-                    //   datosBase.precioEnPesos = precio * cotizacionActual
-                    // } else {
-                    //   datosBase.precioEnPesos = precio
-                    //   datosBase.precioEnDolares = precio / cotizacionActual
-                    // }
-                    // datosBase.cotizacionUsada = cotizacionActual
-                    // datosBase.fechaCotizacion = new Date()
-                  } catch (err) {
-                    // Ignorar si los campos no existen
-                    console.warn('[API PRODUCTO] Campos de moneda no disponibles aún')
-                  }
-                }
-              }
-              
+              console.log('[API PRODUCTO PUT] Datos proveedor:', datosBase)
               return datosBase
             })
           
+          console.log('[API PRODUCTO PUT] Creando', datosProveedores.length, 'relaciones de proveedores')
           await tx.productoProveedor.createMany({
             data: datosProveedores,
             skipDuplicates: true,
           })
+          console.log('[API PRODUCTO PUT] Relaciones de proveedores creadas exitosamente')
         }
       }
 
@@ -275,12 +245,21 @@ export async function PUT(
       })
     })
 
+    console.log('[API PRODUCTO PUT] Producto actualizado exitosamente')
     return NextResponse.json(producto)
   } catch (error: any) {
-    console.error('Error en PUT /api/productos/[id]:', error?.message || String(error))
-    console.error('Stack trace:', error?.stack)
+    console.error('[API PRODUCTO PUT] Error completo:', error)
+    console.error('[API PRODUCTO PUT] Error message:', error?.message || String(error))
+    console.error('[API PRODUCTO PUT] Error stack:', error?.stack)
+    console.error('[API PRODUCTO PUT] Error code:', error?.code)
+    console.error('[API PRODUCTO PUT] Error name:', error?.name)
+    
     return NextResponse.json(
-      { error: 'Error al actualizar producto', details: error?.message },
+      { 
+        error: 'Error al actualizar producto', 
+        details: error?.message || String(error),
+        code: error?.code,
+      },
       { status: 500 }
     )
   }
