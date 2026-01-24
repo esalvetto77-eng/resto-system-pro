@@ -246,10 +246,28 @@ export async function PUT(
           
           console.log('[API PRODUCTO PUT] Creando', datosProveedores.length, 'relaciones de proveedores')
           
-          // Intentar insertar con campos de moneda, si falla usar solo campos básicos
+          // Verificar si los campos de moneda existen antes de intentar usarlos
+          let camposMonedaExisten = false
+          try {
+            // Intentar una consulta simple para verificar si los campos existen
+            await tx.$queryRawUnsafe(`SELECT "moneda" FROM "producto_proveedor" LIMIT 1`)
+            camposMonedaExisten = true
+            console.log('[API PRODUCTO PUT] Campos de moneda existen en BD')
+          } catch (error: any) {
+            if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
+              console.log('[API PRODUCTO PUT] Campos de moneda NO existen en BD, usando solo campos básicos')
+              camposMonedaExisten = false
+            } else {
+              // Si es otro error, asumir que los campos no existen por seguridad
+              console.log('[API PRODUCTO PUT] No se pudo verificar campos de moneda, usando solo campos básicos')
+              camposMonedaExisten = false
+            }
+          }
+          
+          // Insertar proveedores según si los campos existen o no
           for (const datosProv of datosProveedores) {
-            try {
-              // Intentar insertar con campos de moneda
+            if (camposMonedaExisten) {
+              // Insertar con campos de moneda
               await tx.$executeRawUnsafe(`
                 INSERT INTO producto_proveedor (
                   id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
@@ -279,26 +297,21 @@ export async function PUT(
                 datosProv.cotizacionUsada,
                 datosProv.fechaCotizacion
               )
-            } catch (error: any) {
-              // Si los campos de moneda no existen, insertar solo campos básicos
-              if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
-                console.log('[API PRODUCTO PUT] Campos de moneda no existen, usando solo campos básicos')
-                await tx.$executeRawUnsafe(`
-                  INSERT INTO producto_proveedor (id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia", "createdAt", "updatedAt")
-                  VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW(), NOW())
-                  ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
-                    "precioCompra" = EXCLUDED."precioCompra",
-                    "ordenPreferencia" = EXCLUDED."ordenPreferencia",
-                    "updatedAt" = NOW()
-                `,
-                  datosProv.productoId,
-                  datosProv.proveedorId,
-                  datosProv.precioCompra,
-                  datosProv.ordenPreferencia
-                )
-              } else {
-                throw error
-              }
+            } else {
+              // Insertar solo campos básicos
+              await tx.$executeRawUnsafe(`
+                INSERT INTO producto_proveedor (id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia", "createdAt", "updatedAt")
+                VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW(), NOW())
+                ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
+                  "precioCompra" = EXCLUDED."precioCompra",
+                  "ordenPreferencia" = EXCLUDED."ordenPreferencia",
+                  "updatedAt" = NOW()
+              `,
+                datosProv.productoId,
+                datosProv.proveedorId,
+                datosProv.precioCompra,
+                datosProv.ordenPreferencia
+              )
             }
           }
           
