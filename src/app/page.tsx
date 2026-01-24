@@ -130,10 +130,54 @@ export default function HomePage() {
     }
   }
 
+  // Función para actualizar cotización automáticamente (alternativa a cron)
+  const actualizarCotizacionAutomatica = async () => {
+    if (!isAdmin()) return
+    
+    try {
+      // Solo actualizar si han pasado al menos 6 horas desde la última actualización
+      const ultimaActualizacion = localStorage.getItem('ultimaActualizacionCotizacion')
+      const ahora = Date.now()
+      
+      if (ultimaActualizacion) {
+        const tiempoTranscurrido = ahora - parseInt(ultimaActualizacion)
+        const seisHoras = 6 * 60 * 60 * 1000 // 6 horas en milisegundos
+        
+        // Si han pasado menos de 6 horas, no actualizar
+        if (tiempoTranscurrido < seisHoras) {
+          console.log('[COTIZACION] Aún no es necesario actualizar (última actualización hace', Math.round(tiempoTranscurrido / 1000 / 60), 'minutos)')
+          return
+        }
+      }
+      
+      console.log('[COTIZACION] Actualizando cotización automáticamente...')
+      const response = await fetch('/api/cotizacion-dolar/actualizar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('[COTIZACION] Cotización actualizada:', data)
+        // Guardar timestamp de última actualización
+        localStorage.setItem('ultimaActualizacionCotizacion', ahora.toString())
+      } else {
+        console.warn('[COTIZACION] No se pudo actualizar automáticamente')
+      }
+    } catch (error) {
+      console.warn('[COTIZACION] Error al actualizar automáticamente:', error)
+      // No mostrar error al usuario, es una actualización en segundo plano
+    }
+  }
+
   useEffect(() => {
     // No esperar si ya hay restaurante o si ya pasó suficiente tiempo
     fetchStats()
     fetchAlertasCarnets()
+    // Actualizar cotización automáticamente cuando se accede al dashboard (solo admin)
+    actualizarCotizacionAutomatica()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restauranteActivo?.id])
   
