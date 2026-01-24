@@ -286,36 +286,60 @@ export async function POST(request: NextRequest) {
           })
         
         // Insertar cada proveedor usando SQL directo con campos de moneda
+        // Si los campos no existen, usar solo campos básicos
         for (const datosProv of proveedoresParaCrear) {
-          await tx.$executeRawUnsafe(`
-            INSERT INTO producto_proveedor (
-              id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
-              "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
-              "createdAt", "updatedAt"
+          try {
+            // Intentar insertar con campos de moneda
+            await tx.$executeRawUnsafe(`
+              INSERT INTO producto_proveedor (
+                id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
+                "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
+                "createdAt", "updatedAt"
+              )
+              VALUES (
+                gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
+              )
+              ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
+                "precioCompra" = EXCLUDED."precioCompra",
+                "ordenPreferencia" = EXCLUDED."ordenPreferencia",
+                "moneda" = EXCLUDED."moneda",
+                "precioEnDolares" = EXCLUDED."precioEnDolares",
+                "precioEnPesos" = EXCLUDED."precioEnPesos",
+                "cotizacionUsada" = EXCLUDED."cotizacionUsada",
+                "fechaCotizacion" = EXCLUDED."fechaCotizacion",
+                "updatedAt" = NOW()
+            `,
+              datosProv.productoId,
+              datosProv.proveedorId,
+              datosProv.precioCompra,
+              datosProv.ordenPreferencia,
+              datosProv.moneda,
+              datosProv.precioEnDolares,
+              datosProv.precioEnPesos,
+              datosProv.cotizacionUsada,
+              datosProv.fechaCotizacion
             )
-            VALUES (
-              gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
-            )
-            ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
-              "precioCompra" = EXCLUDED."precioCompra",
-              "ordenPreferencia" = EXCLUDED."ordenPreferencia",
-              "moneda" = EXCLUDED."moneda",
-              "precioEnDolares" = EXCLUDED."precioEnDolares",
-              "precioEnPesos" = EXCLUDED."precioEnPesos",
-              "cotizacionUsada" = EXCLUDED."cotizacionUsada",
-              "fechaCotizacion" = EXCLUDED."fechaCotizacion",
-              "updatedAt" = NOW()
-          `,
-            datosProv.productoId,
-            datosProv.proveedorId,
-            datosProv.precioCompra,
-            datosProv.ordenPreferencia,
-            datosProv.moneda,
-            datosProv.precioEnDolares,
-            datosProv.precioEnPesos,
-            datosProv.cotizacionUsada,
-            datosProv.fechaCotizacion
-          )
+          } catch (error: any) {
+            // Si los campos de moneda no existen, insertar solo campos básicos
+            if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
+              console.log('[API PRODUCTOS POST] Campos de moneda no existen, usando solo campos básicos')
+              await tx.$executeRawUnsafe(`
+                INSERT INTO producto_proveedor (id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia", "createdAt", "updatedAt")
+                VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW(), NOW())
+                ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
+                  "precioCompra" = EXCLUDED."precioCompra",
+                  "ordenPreferencia" = EXCLUDED."ordenPreferencia",
+                  "updatedAt" = NOW()
+              `,
+                datosProv.productoId,
+                datosProv.proveedorId,
+                datosProv.precioCompra,
+                datosProv.ordenPreferencia
+              )
+            } else {
+              throw error
+            }
+          }
         }
       }
 
