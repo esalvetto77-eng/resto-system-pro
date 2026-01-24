@@ -124,9 +124,59 @@ export async function GET() {
       console.log('[API INVENTARIO] Inventario completo después de crear registros:', inventario.length)
     }
 
+    // Intentar leer campos de moneda usando SQL directo si existen
+    const proveedorIds = inventario
+      .map(item => item.producto.proveedores?.[0]?.id)
+      .filter((id): id is string => id !== undefined)
+    
+    let monedaData: Record<string, any> = {}
+    
+    if (proveedorIds.length > 0) {
+      try {
+        // Intentar leer campos de moneda si existen
+        // Construir la lista de IDs para la consulta SQL
+        const idsList = proveedorIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',')
+        const query = `
+          SELECT 
+            id,
+            "moneda",
+            "precioEnDolares",
+            "precioEnPesos",
+            "cotizacionUsada",
+            "fechaCotizacion"
+          FROM "producto_proveedor"
+          WHERE id IN (${idsList})
+        `
+        const result = await prisma.$queryRawUnsafe<Array<{
+          id: string
+          moneda?: string | null
+          precioEnDolares?: number | null
+          precioEnPesos?: number | null
+          cotizacionUsada?: number | null
+          fechaCotizacion?: Date | null
+        }>>(query)
+        
+        // Crear un mapa de ID a datos de moneda
+        result.forEach((row) => {
+          monedaData[row.id] = {
+            moneda: row.moneda || null,
+            precioEnDolares: row.precioEnDolares || null,
+            precioEnPesos: row.precioEnPesos || null,
+            cotizacionUsada: row.cotizacionUsada || null,
+            fechaCotizacion: row.fechaCotizacion ? row.fechaCotizacion.toISOString() : null,
+          }
+        })
+      } catch (error: any) {
+        // Si los campos no existen, simplemente continuar con valores null
+        console.log('[API INVENTARIO] Campos de moneda no disponibles en BD:', error?.message)
+      }
+    }
+
     // Transformar la respuesta para que coincida con lo que espera el frontend
     const inventarioTransformado = inventario.map((item) => {
       const primerProveedor = item.producto.proveedores?.[0]
+      const datosMoneda = primerProveedor?.id ? monedaData[primerProveedor.id] : null
+      
       return {
         id: item.id,
         productoId: item.productoId,
@@ -141,13 +191,12 @@ export async function GET() {
           precioCompra: primerProveedor?.precioCompra || null,
           rubro: item.producto.rubro,
           proveedor: primerProveedor?.proveedor || null,
-          // Campos de moneda (solo se incluyen si existen en la BD)
-          // Se intentarán leer desde la BD usando SQL directo si es necesario
-          moneda: null,
-          precioEnDolares: null,
-          precioEnPesos: null,
-          cotizacionUsada: null,
-          fechaCotizacion: null,
+          // Campos de moneda (leídos desde BD si existen)
+          moneda: datosMoneda?.moneda || null,
+          precioEnDolares: datosMoneda?.precioEnDolares || null,
+          precioEnPesos: datosMoneda?.precioEnPesos || null,
+          cotizacionUsada: datosMoneda?.cotizacionUsada || null,
+          fechaCotizacion: datosMoneda?.fechaCotizacion || null,
         },
       }
     })
