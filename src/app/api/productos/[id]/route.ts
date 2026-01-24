@@ -13,34 +13,65 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const producto = await prisma.producto.findUnique({
-      where: { id: params.id },
-      include: {
-        proveedores: {
-          include: {
-            proveedor: {
-              select: {
-                id: true,
-                nombre: true,
-                contacto: true,
-                telefono: true,
+    console.log('[API PRODUCTO] Obteniendo producto:', params.id)
+    
+    // Intentar consulta con todos los campos primero
+    let producto
+    try {
+      producto = await prisma.producto.findUnique({
+        where: { id: params.id },
+        include: {
+          proveedores: {
+            include: {
+              proveedor: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  contacto: true,
+                  telefono: true,
+                },
               },
             },
+            orderBy: {
+              ordenPreferencia: 'asc',
+            },
           },
-          orderBy: {
-            ordenPreferencia: 'asc',
-          },
+          inventario: true,
         },
-        inventario: true,
-      },
-    })
+      })
+    } catch (dbError: any) {
+      console.error('[API PRODUCTO] Error en consulta de BD:', dbError)
+      // Si falla por campos que no existen, intentar consulta básica
+      producto = await prisma.producto.findUnique({
+        where: { id: params.id },
+        include: {
+          proveedores: {
+            include: {
+              proveedor: {
+                select: {
+                  id: true,
+                  nombre: true,
+                },
+              },
+            },
+            orderBy: {
+              ordenPreferencia: 'asc',
+            },
+          },
+          inventario: true,
+        },
+      })
+    }
 
     if (!producto) {
+      console.log('[API PRODUCTO] Producto no encontrado:', params.id)
       return NextResponse.json(
         { error: 'Producto no encontrado' },
         { status: 404 }
       )
     }
+
+    console.log('[API PRODUCTO] Producto encontrado:', producto.id, producto.nombre)
 
     // Asegurar que los campos nuevos tengan valores por defecto si son null (para productos antiguos)
     const productoConDefaults = {
@@ -55,11 +86,18 @@ export async function GET(
       })),
     }
 
+    console.log('[API PRODUCTO] Producto procesado, devolviendo respuesta')
     return NextResponse.json(productoConDefaults)
   } catch (error: any) {
-    console.error('Error en GET /api/productos/[id]:', error?.message || String(error))
+    console.error('[API PRODUCTO] Error completo:', error)
+    console.error('[API PRODUCTO] Error message:', error?.message)
+    console.error('[API PRODUCTO] Error stack:', error?.stack)
+    console.error('[API PRODUCTO] Error name:', error?.name)
     return NextResponse.json(
-      { error: 'Error al obtener producto' },
+      { 
+        error: 'Error al obtener producto',
+        details: error?.message || String(error),
+      },
       { status: 500 }
     )
   }

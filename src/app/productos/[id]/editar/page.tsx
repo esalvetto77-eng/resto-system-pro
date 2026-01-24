@@ -69,8 +69,14 @@ export default function EditarProductoPage({
         ])
 
         if (!productoRes.ok) {
-          const errorData = await productoRes.json().catch(() => ({ error: 'Error desconocido' }))
-          throw new Error(errorData.error || 'Error al cargar producto')
+          let errorData
+          try {
+            errorData = await productoRes.json()
+          } catch {
+            errorData = { error: `Error HTTP ${productoRes.status}: ${productoRes.statusText}` }
+          }
+          console.error('[EDITAR PRODUCTO] Error en respuesta:', productoRes.status, errorData)
+          throw new Error(errorData.error || `Error al cargar producto (${productoRes.status})`)
         }
         if (!proveedoresRes.ok) {
           const errorData = await proveedoresRes.json().catch(() => ({ error: 'Error desconocido' }))
@@ -80,7 +86,11 @@ export default function EditarProductoPage({
         const producto = await productoRes.json()
         const proveedoresData = await proveedoresRes.json()
 
+        console.log('[EDITAR PRODUCTO] Producto recibido:', producto)
+        console.log('[EDITAR PRODUCTO] Proveedores del producto:', producto.proveedores)
+
         if (!producto || !producto.id) {
+          console.error('[EDITAR PRODUCTO] Producto inválido:', producto)
           throw new Error('Datos del producto inválidos')
         }
 
@@ -110,8 +120,10 @@ export default function EditarProductoPage({
           ])
         }
       } catch (error: any) {
-        console.error('Error al cargar datos:', error)
-        alert(error?.message || 'Error al cargar los datos')
+        console.error('[EDITAR PRODUCTO] Error completo:', error)
+        console.error('[EDITAR PRODUCTO] Error message:', error?.message)
+        console.error('[EDITAR PRODUCTO] Error stack:', error?.stack)
+        alert(`Error al obtener producto: ${error?.message || 'Error desconocido'}\n\nRevisa la consola para más detalles.`)
         router.push('/productos')
       } finally {
         setLoading(false)
