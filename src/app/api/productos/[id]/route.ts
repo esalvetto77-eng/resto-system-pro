@@ -215,10 +215,25 @@ export async function PUT(
             })
           
           console.log('[API PRODUCTO PUT] Creando', datosProveedores.length, 'relaciones de proveedores')
-          await tx.productoProveedor.createMany({
-            data: datosProveedores,
-            skipDuplicates: true,
-          })
+          
+          // Usar SQL directo para evitar que Prisma intente escribir campos que no existen
+          // Insertar cada proveedor individualmente para evitar problemas con campos opcionales
+          for (const datosProv of datosProveedores) {
+            await tx.$executeRawUnsafe(`
+              INSERT INTO producto_proveedor (id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia", "createdAt", "updatedAt")
+              VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW(), NOW())
+              ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
+                "precioCompra" = EXCLUDED."precioCompra",
+                "ordenPreferencia" = EXCLUDED."ordenPreferencia",
+                "updatedAt" = NOW()
+            `,
+              datosProv.productoId,
+              datosProv.proveedorId,
+              datosProv.precioCompra,
+              datosProv.ordenPreferencia
+            )
+          }
+          
           console.log('[API PRODUCTO PUT] Relaciones de proveedores creadas exitosamente')
         }
       }
