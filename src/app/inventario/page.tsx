@@ -80,6 +80,20 @@ export default function InventarioPage() {
       console.log('Inventario recibido:', data)
       console.log('Es array?', Array.isArray(data))
       console.log('Cantidad de items:', Array.isArray(data) ? data.length : 0)
+      
+      // Log para debugging de moneda
+      if (Array.isArray(data)) {
+        data.forEach((item: any) => {
+          if (item.producto?.moneda === 'USD' || item.producto?.precioEnDolares) {
+            console.log('[INVENTARIO] Producto en USD:', item.producto.nombre, {
+              moneda: item.producto.moneda,
+              precioEnDolares: item.producto.precioEnDolares,
+              precioCompra: item.producto.precioCompra
+            })
+          }
+        })
+      }
+      
       setInventario(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error al cargar inventario:', error)

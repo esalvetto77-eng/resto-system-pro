@@ -147,6 +147,7 @@ export async function GET() {
           FROM "producto_proveedor"
           WHERE id IN (${idsList})
         `
+        console.log('[API INVENTARIO] Intentando leer campos de moneda para', proveedorIds.length, 'proveedores')
         const result = await prisma.$queryRawUnsafe<Array<{
           id: string
           moneda?: string | null
@@ -155,6 +156,8 @@ export async function GET() {
           cotizacionUsada?: number | null
           fechaCotizacion?: Date | null
         }>>(query)
+        
+        console.log('[API INVENTARIO] Resultados de moneda:', result.length, 'registros encontrados')
         
         // Crear un mapa de ID a datos de moneda
         result.forEach((row) => {
@@ -165,10 +168,12 @@ export async function GET() {
             cotizacionUsada: row.cotizacionUsada || null,
             fechaCotizacion: row.fechaCotizacion ? row.fechaCotizacion.toISOString() : null,
           }
+          console.log('[API INVENTARIO] Moneda para', row.id, ':', row.moneda, 'precioEnDolares:', row.precioEnDolares)
         })
       } catch (error: any) {
         // Si los campos no existen, simplemente continuar con valores null
         console.log('[API INVENTARIO] Campos de moneda no disponibles en BD:', error?.message)
+        console.log('[API INVENTARIO] Error completo:', error)
       }
     }
 
@@ -177,7 +182,7 @@ export async function GET() {
       const primerProveedor = item.producto.proveedores?.[0]
       const datosMoneda = primerProveedor?.id ? monedaData[primerProveedor.id] : null
       
-      return {
+      const productoTransformado = {
         id: item.id,
         productoId: item.productoId,
         stockActual: item.stockActual,
@@ -199,6 +204,13 @@ export async function GET() {
           fechaCotizacion: datosMoneda?.fechaCotizacion || null,
         },
       }
+      
+      // Log para debugging
+      if (datosMoneda) {
+        console.log('[API INVENTARIO] Producto', item.producto.nombre, '- Moneda:', datosMoneda.moneda, 'Precio USD:', datosMoneda.precioEnDolares)
+      }
+      
+      return productoTransformado
     })
 
     console.log('[API INVENTARIO] Devolviendo', inventarioTransformado.length, 'items')
