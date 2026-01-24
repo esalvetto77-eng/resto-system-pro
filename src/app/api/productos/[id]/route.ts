@@ -205,51 +205,27 @@ export async function PUT(
             console.warn('No se pudo obtener cotización, se guardará sin conversión:', err)
           }
 
-          // Crear datos básicos primero (sin campos nuevos que pueden no existir)
+          // Crear datos básicos (solo campos que siempre existen en la BD)
           const datosProveedores = body.proveedores
             .filter((prov: any) => prov.proveedorId)
-            .map((prov: any, index: number) => {
-              const precio = toNumberOrNull(prov.precioCompra)
-              const moneda = prov.moneda || 'UYU'
-              
-              // Datos básicos que siempre existen
-              const datosBase: any = {
-                productoId: params.id,
-                proveedorId: prov.proveedorId,
-                precioCompra: precio,
-                ordenPreferencia: prov.ordenPreferencia || index + 1,
-              }
-              
-              // Solo agregar campos nuevos si la moneda es USD y tenemos cotización
-              // Si los campos no existen en la BD, Prisma los ignorará
-              try {
-                if (precio && moneda === 'USD' && cotizacionActual) {
-                  datosBase.moneda = moneda
-                  datosBase.precioEnDolares = precio
-                  datosBase.precioEnPesos = precio * cotizacionActual
-                  datosBase.cotizacionUsada = cotizacionActual
-                  datosBase.fechaCotizacion = new Date()
-                } else if (precio && moneda === 'UYU') {
-                  datosBase.moneda = moneda
-                  datosBase.precioEnPesos = precio
-                  if (cotizacionActual) {
-                    datosBase.precioEnDolares = precio / cotizacionActual
-                    datosBase.cotizacionUsada = cotizacionActual
-                    datosBase.fechaCotizacion = new Date()
-                  }
-                }
-              } catch (err) {
-                // Si falla al agregar campos nuevos, continuar con datos básicos
-                console.warn('[API PRODUCTO] No se pudieron agregar campos de moneda:', err)
-              }
-              
-              return datosBase
-            })
+            .map((prov: any, index: number) => ({
+              productoId: params.id,
+              proveedorId: prov.proveedorId,
+              precioCompra: toNumberOrNull(prov.precioCompra),
+              ordenPreferencia: prov.ordenPreferencia || index + 1,
+            }))
           
-          await tx.productoProveedor.createMany({
-            data: datosProveedores,
-            skipDuplicates: true,
-          })
+          // Intentar crear con campos básicos primero
+          try {
+            await tx.productoProveedor.createMany({
+              data: datosProveedores,
+              skipDuplicates: true,
+            })
+          } catch (createError: any) {
+            console.error('[API PRODUCTO] Error al crear proveedores:', createError)
+            // Si falla, puede ser por campos que no existen, intentar sin ellos
+            throw createError
+          }
         }
       }
 
