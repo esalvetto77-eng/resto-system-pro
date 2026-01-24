@@ -12,7 +12,7 @@ export async function GET() {
     console.log('[API INVENTARIO] Obteniendo inventario...')
     
     // Usar select explícito para evitar leer campos que no existen
-    const inventario = await prisma.inventario.findMany({
+    let inventario = await prisma.inventario.findMany({
       select: {
         id: true,
         productoId: true,
