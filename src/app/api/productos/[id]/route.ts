@@ -42,7 +42,20 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(producto)
+    // Asegurar que los campos nuevos tengan valores por defecto si son null (para productos antiguos)
+    const productoConDefaults = {
+      ...producto,
+      proveedores: producto.proveedores.map((pp: any) => ({
+        ...pp,
+        moneda: pp.moneda || 'UYU',
+        precioEnDolares: pp.precioEnDolares ?? null,
+        precioEnPesos: pp.precioEnPesos ?? (pp.moneda === 'UYU' || !pp.moneda ? pp.precioCompra : null),
+        cotizacionUsada: pp.cotizacionUsada ?? null,
+        fechaCotizacion: pp.fechaCotizacion ?? null,
+      })),
+    }
+
+    return NextResponse.json(productoConDefaults)
   } catch (error: any) {
     console.error('Error en GET /api/productos/[id]:', error?.message || String(error))
     return NextResponse.json(
@@ -131,15 +144,51 @@ export async function PUT(
             }
           }
 
+          // Obtener cotización actual del dólar
+          let cotizacionActual = null
+          try {
+            const { obtenerCotizacionBROU } = await import('@/lib/utils')
+            const cotizacionData = await obtenerCotizacionBROU()
+            if (cotizacionData) {
+              cotizacionActual = (cotizacionData.compra + cotizacionData.venta) / 2
+            }
+          } catch (err) {
+            console.warn('No se pudo obtener cotización, se guardará sin conversión:', err)
+          }
+
           await tx.productoProveedor.createMany({
             data: body.proveedores
               .filter((prov: any) => prov.proveedorId)
-              .map((prov: any, index: number) => ({
-                productoId: params.id,
-                proveedorId: prov.proveedorId,
-                precioCompra: toNumberOrNull(prov.precioCompra),
-                ordenPreferencia: prov.ordenPreferencia || index + 1,
-              })),
+              .map((prov: any, index: number) => {
+                const precio = toNumberOrNull(prov.precioCompra)
+                const moneda = prov.moneda || 'UYU'
+                
+                // Calcular precios según la moneda
+                let precioEnDolares = null
+                let precioEnPesos = null
+                
+                if (precio) {
+                  if (moneda === 'USD') {
+                    precioEnDolares = precio
+                    precioEnPesos = cotizacionActual ? precio * cotizacionActual : null
+                  } else {
+                    precioEnPesos = precio
+                    precioEnDolares = cotizacionActual ? precio / cotizacionActual : null
+                  }
+                }
+                
+                return {
+                  productoId: params.id,
+                  proveedorId: prov.proveedorId,
+                  precioCompra: precio,
+                  moneda: moneda,
+                  precioEnDolares: precioEnDolares,
+                  precioEnPesos: precioEnPesos,
+                  cotizacionUsada: cotizacionActual,
+                  fechaCotizacion: cotizacionActual ? new Date() : null,
+                  ordenPreferencia: prov.ordenPreferencia || index + 1,
+                }
+              }),
           })
         }
       }
