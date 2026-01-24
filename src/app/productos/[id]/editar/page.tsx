@@ -56,13 +56,27 @@ export default function EditarProductoPage({
     rubro: '',
     activo: true,
   })
+  const [cotizacionDolar, setCotizacionDolar] = useState<number | null>(null)
   const [proveedoresProducto, setProveedoresProducto] = useState<
-    Array<{ proveedorId: string; precioCompra: number | null; ordenPreferencia: number }>
+    Array<{ 
+      proveedorId: string
+      precioCompra: number | null
+      moneda: 'USD' | 'UYU'
+      ordenPreferencia: number
+    }>
   >([])
 
   useEffect(() => {
     async function fetchData() {
       try {
+        // Obtener cotización del dólar
+        const cotizacionRes = await fetch('/api/cotizacion-dolar')
+        if (cotizacionRes.ok) {
+          const cotizacionData = await cotizacionRes.json()
+          const promedio = (cotizacionData.compra + cotizacionData.venta) / 2
+          setCotizacionDolar(promedio)
+        }
+        
         const [productoRes, proveedoresRes] = await Promise.all([
           fetch(`/api/productos/${params.id}`),
           fetch('/api/proveedores?activo=true'),
@@ -111,12 +125,13 @@ export default function EditarProductoPage({
             producto.proveedores.map((pp: any) => ({
               proveedorId: pp.proveedor?.id || '',
               precioCompra: pp.precioCompra || null,
+              moneda: pp.moneda || 'UYU',
               ordenPreferencia: pp.ordenPreferencia || 1,
             }))
           )
         } else {
           setProveedoresProducto([
-            { proveedorId: '', precioCompra: null, ordenPreferencia: 1 },
+            { proveedorId: '', precioCompra: null, moneda: 'UYU', ordenPreferencia: 1 },
           ])
         }
       } catch (error: any) {
@@ -138,6 +153,7 @@ export default function EditarProductoPage({
       {
         proveedorId: '',
         precioCompra: null,
+        moneda: 'UYU',
         ordenPreferencia: proveedoresProducto.length + 1,
       },
     ])
@@ -153,7 +169,7 @@ export default function EditarProductoPage({
 
   const updateProveedor = (
     index: number,
-    field: 'proveedorId' | 'precioCompra' | 'ordenPreferencia',
+    field: 'proveedorId' | 'precioCompra' | 'moneda' | 'ordenPreferencia',
     value: string | number | null
   ) => {
     const nuevos = [...proveedoresProducto]
@@ -161,10 +177,18 @@ export default function EditarProductoPage({
       nuevos[index].precioCompra = value === '' ? null : Number(value)
     } else if (field === 'ordenPreferencia') {
       nuevos[index].ordenPreferencia = Number(value)
+    } else if (field === 'moneda') {
+      nuevos[index].moneda = value as 'USD' | 'UYU'
     } else {
       nuevos[index].proveedorId = value as string
     }
     setProveedoresProducto(nuevos)
+  }
+
+  const calcularPrecioEnPesos = (precio: number | null, moneda: 'USD' | 'UYU'): number | null => {
+    if (!precio || !cotizacionDolar) return null
+    if (moneda === 'UYU') return precio
+    return precio * cotizacionDolar
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -348,7 +372,22 @@ export default function EditarProductoPage({
                     </select>
                   </div>
                   <div>
-                    <label className="label">Precio</label>
+                    <label className="label">Moneda</label>
+                    <select
+                      className="input"
+                      value={prov.moneda}
+                      onChange={(e) =>
+                        updateProveedor(index, 'moneda', e.target.value)
+                      }
+                    >
+                      <option value="UYU">UYU (Pesos)</option>
+                      <option value="USD">USD (Dólares)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">
+                      Precio {prov.moneda === 'USD' ? '(USD)' : '(UYU)'}
+                    </label>
                     <input
                       type="number"
                       min="0"
@@ -360,6 +399,14 @@ export default function EditarProductoPage({
                       }
                       placeholder="Opcional"
                     />
+                    {prov.moneda === 'USD' && prov.precioCompra && cotizacionDolar && (
+                      <div className="mt-1 text-xs text-neutral-600">
+                        ≈ {calcularPrecioEnPesos(prov.precioCompra, 'USD')?.toFixed(2)} UYU
+                        <span className="text-neutral-400 ml-1">
+                          (Cotización: ${cotizacionDolar.toFixed(2)})
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="label">Orden</label>
