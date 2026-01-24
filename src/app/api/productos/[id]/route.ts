@@ -206,26 +206,50 @@ export async function PUT(
           }
 
           // Crear datos básicos (solo campos que siempre existen en la BD)
+          // No incluir campos de moneda que pueden no existir aún
           const datosProveedores = body.proveedores
             .filter((prov: any) => prov.proveedorId)
-            .map((prov: any, index: number) => ({
-              productoId: params.id,
-              proveedorId: prov.proveedorId,
-              precioCompra: toNumberOrNull(prov.precioCompra),
-              ordenPreferencia: prov.ordenPreferencia || index + 1,
-            }))
-          
-          // Intentar crear con campos básicos primero
-          try {
-            await tx.productoProveedor.createMany({
-              data: datosProveedores,
-              skipDuplicates: true,
+            .map((prov: any, index: number) => {
+              const datosBase: any = {
+                productoId: params.id,
+                proveedorId: prov.proveedorId,
+                precioCompra: toNumberOrNull(prov.precioCompra),
+                ordenPreferencia: prov.ordenPreferencia || index + 1,
+              }
+              
+              // Solo agregar campos de moneda si están presentes y tenemos cotización
+              // Si los campos no existen en la BD, Prisma los ignorará o fallará
+              // Por ahora, solo guardamos los campos básicos hasta que se agreguen a la BD
+              if (prov.moneda && cotizacionActual) {
+                const precio = toNumberOrNull(prov.precioCompra)
+                if (precio) {
+                  try {
+                    // Intentar agregar campos de moneda solo si están en el schema
+                    // Si no existen, Prisma fallará, así que los omitimos por ahora
+                    // datosBase.moneda = prov.moneda
+                    // if (prov.moneda === 'USD') {
+                    //   datosBase.precioEnDolares = precio
+                    //   datosBase.precioEnPesos = precio * cotizacionActual
+                    // } else {
+                    //   datosBase.precioEnPesos = precio
+                    //   datosBase.precioEnDolares = precio / cotizacionActual
+                    // }
+                    // datosBase.cotizacionUsada = cotizacionActual
+                    // datosBase.fechaCotizacion = new Date()
+                  } catch (err) {
+                    // Ignorar si los campos no existen
+                    console.warn('[API PRODUCTO] Campos de moneda no disponibles aún')
+                  }
+                }
+              }
+              
+              return datosBase
             })
-          } catch (createError: any) {
-            console.error('[API PRODUCTO] Error al crear proveedores:', createError)
-            // Si falla, puede ser por campos que no existen, intentar sin ellos
-            throw createError
-          }
+          
+          await tx.productoProveedor.createMany({
+            data: datosProveedores,
+            skipDuplicates: true,
+          })
         }
       }
 
