@@ -165,52 +165,32 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Obtener cotización actual del dólar
-        let cotizacionActual = null
-        try {
-          const { obtenerCotizacionBROU } = await import('@/lib/utils')
-          const cotizacionData = await obtenerCotizacionBROU()
-          if (cotizacionData) {
-            cotizacionActual = (cotizacionData.compra + cotizacionData.venta) / 2
-          }
-        } catch (err) {
-          console.warn('No se pudo obtener cotización, se guardará sin conversión:', err)
+        // Crear relaciones de proveedores usando SQL directo para evitar campos que no existen
+        const proveedoresParaCrear = body.proveedores
+          .filter((prov: any) => prov.proveedorId)
+          .map((prov: any, index: number) => ({
+            productoId: nuevoProducto.id,
+            proveedorId: prov.proveedorId,
+            precioCompra: toNumberOrNull(prov.precioCompra),
+            ordenPreferencia: prov.ordenPreferencia || index + 1,
+          }))
+        
+        // Insertar cada proveedor usando SQL directo
+        for (const datosProv of proveedoresParaCrear) {
+          await tx.$executeRawUnsafe(`
+            INSERT INTO producto_proveedor (id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia", "createdAt", "updatedAt")
+            VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW(), NOW())
+            ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
+              "precioCompra" = EXCLUDED."precioCompra",
+              "ordenPreferencia" = EXCLUDED."ordenPreferencia",
+              "updatedAt" = NOW()
+          `,
+            datosProv.productoId,
+            datosProv.proveedorId,
+            datosProv.precioCompra,
+            datosProv.ordenPreferencia
+          )
         }
-
-        await tx.productoProveedor.createMany({
-          data: body.proveedores
-            .filter((prov: any) => prov.proveedorId)
-            .map((prov: any, index: number) => {
-              const precio = toNumberOrNull(prov.precioCompra)
-              const moneda = prov.moneda || 'UYU'
-              
-              // Calcular precios según la moneda
-              let precioEnDolares = null
-              let precioEnPesos = null
-              
-              if (precio) {
-                if (moneda === 'USD') {
-                  precioEnDolares = precio
-                  precioEnPesos = cotizacionActual ? precio * cotizacionActual : null
-                } else {
-                  precioEnPesos = precio
-                  precioEnDolares = cotizacionActual ? precio / cotizacionActual : null
-                }
-              }
-              
-              return {
-                productoId: nuevoProducto.id,
-                proveedorId: prov.proveedorId,
-                precioCompra: precio,
-                moneda: moneda,
-                precioEnDolares: precioEnDolares,
-                precioEnPesos: precioEnPesos,
-                cotizacionUsada: cotizacionActual,
-                fechaCotizacion: cotizacionActual ? new Date() : null,
-                ordenPreferencia: prov.ordenPreferencia || index + 1,
-              }
-            }),
-        })
       }
 
       // Retornar producto con proveedores e inventario
