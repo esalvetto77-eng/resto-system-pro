@@ -120,32 +120,74 @@ export interface CotizacionBROU {
 // Función para obtener cotización del BROU (compartida)
 export async function obtenerCotizacionBROU(): Promise<CotizacionBROU | null> {
   try {
-    // El BROU no tiene API pública oficial, pero podemos obtener la cotización
-    // desde su página web o usar un servicio que la provea
+    // Intentar múltiples fuentes para obtener la cotización del BROU
     
-    // Intentar obtener desde exchangerate-api (tiene UYU pero puede no ser BROU)
-    const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD', {
-      next: { revalidate: 3600 }, // Cache por 1 hora
-      headers: {
-        'User-Agent': 'Mozilla/5.0',
-      },
-    })
-    
-    if (!response.ok) {
-      throw new Error('Error al obtener cotización')
+    // Fuente 1: Intentar obtener desde la página del BROU (scraping)
+    try {
+      const brouResponse = await fetch('https://www.brou.com.uy/web/guest/cotizaciones', {
+        next: { revalidate: 3600 }, // Cache por 1 hora
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      })
+      
+      if (brouResponse.ok) {
+        const html = await brouResponse.text()
+        // Buscar patrones comunes en la página del BROU
+        // El BROU muestra la cotización en formato específico
+        const compraMatch = html.match(/compra.*?(\d+[.,]\d+)/i)
+        const ventaMatch = html.match(/venta.*?(\d+[.,]\d+)/i)
+        
+        if (compraMatch && ventaMatch) {
+          const compra = parseFloat(compraMatch[1].replace(',', '.'))
+          const venta = parseFloat(ventaMatch[1].replace(',', '.'))
+          
+          if (compra > 35 && compra < 45 && venta > 35 && venta < 45 && venta > compra) {
+            return {
+              compra,
+              venta,
+              fecha: new Date().toISOString().split('T')[0],
+              fuente: 'BROU (web oficial)',
+            }
+          }
+        }
+      }
+    } catch (brouError) {
+      console.warn('[COTIZACION] No se pudo obtener desde BROU web:', brouError)
     }
     
-    const data = await response.json()
+    // Fuente 2: API alternativa - exchangerate-api
+    try {
+      const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD', {
+        next: { revalidate: 3600 },
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+        },
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        const tasaUYU = data.rates?.UYU
+        
+        if (tasaUYU && tasaUYU >= 35 && tasaUYU <= 45) {
+          const spread = 0.75
+          return {
+            compra: tasaUYU - spread / 2,
+            venta: tasaUYU + spread / 2,
+            fecha: new Date().toISOString().split('T')[0],
+            fuente: 'BROU (via API alternativa)',
+          }
+        }
+      }
+    } catch (apiError) {
+      console.warn('[COTIZACION] No se pudo obtener desde API alternativa:', apiError)
+    }
     
-    // Buscar tasa para UYU (Peso Uruguayo)
-    const tasaUYU = data.rates?.UYU
-    
-    // Intentar obtener desde variable de entorno primero (tiene prioridad)
+    // Fuente 3: Variable de entorno (tiene prioridad sobre defaults)
     const cotizacionManual = process.env.COTIZACION_DOLAR_BROU
     if (cotizacionManual) {
       const valor = parseFloat(cotizacionManual)
       if (!isNaN(valor) && valor > 0) {
-        // Spread típico del BROU: aproximadamente 0.5-1 UYU
         const spread = 0.75
         return {
           compra: valor - spread / 2,
@@ -156,48 +198,19 @@ export async function obtenerCotizacionBROU(): Promise<CotizacionBROU | null> {
       }
     }
     
-    if (!tasaUYU || tasaUYU < 35 || tasaUYU > 45) {
-      // Si la tasa no es razonable o no está disponible, usar valor por defecto actualizado
-      console.warn('[COTIZACION] Tasa UYU no válida o fuera de rango, usando valor por defecto')
-      
-      // Valor por defecto actualizado (enero 2026): ~38.9 UYU
-      const valorDefault = 38.9
-      const spread = 0.75
-      return {
-        compra: valorDefault - spread / 2,
-        venta: valorDefault + spread / 2,
-        fecha: new Date().toISOString().split('T')[0],
-        fuente: 'BROU (valor por defecto - actualizar)',
-      }
-    }
-    
-    // El BROU generalmente tiene una diferencia entre compra y venta
-    // Spread típico del BROU: aproximadamente 0.5-1 UYU
+    // Valor por defecto si todo falla (enero 2026: ~38.9 UYU)
+    const valorDefault = 38.9
     const spread = 0.75
-    
-    // Si la tasa obtenida es muy diferente a la esperada, usar valor por defecto
-    if (tasaUYU < 35 || tasaUYU > 45) {
-      const valorDefault = 38.9
-      return {
-        compra: valorDefault - spread / 2,
-        venta: valorDefault + spread / 2,
-        fecha: new Date().toISOString().split('T')[0],
-        fuente: 'BROU (valor por defecto - tasa API fuera de rango)',
-      }
-    }
-    
-    // Usar la tasa obtenida como referencia (promedio)
-    // Ajustar para compra (menor) y venta (mayor)
     return {
-      compra: tasaUYU - spread / 2,
-      venta: tasaUYU + spread / 2,
+      compra: valorDefault - spread / 2,
+      venta: valorDefault + spread / 2,
       fecha: new Date().toISOString().split('T')[0],
-      fuente: 'BROU (via API)',
+      fuente: 'BROU (valor por defecto)',
     }
   } catch (error) {
     console.error('[COTIZACION] Error al obtener cotización del BROU:', error)
     
-    // Intentar obtener desde variable de entorno como fallback
+    // Fallback final: variable de entorno o valor por defecto
     const cotizacionManual = process.env.COTIZACION_DOLAR_BROU
     if (cotizacionManual) {
       const valor = parseFloat(cotizacionManual)
@@ -212,7 +225,6 @@ export async function obtenerCotizacionBROU(): Promise<CotizacionBROU | null> {
       }
     }
     
-    // Valor por defecto actualizado si todo falla (enero 2026: ~38.9 UYU)
     const valorDefault = 38.9
     const spread = 0.75
     return {
