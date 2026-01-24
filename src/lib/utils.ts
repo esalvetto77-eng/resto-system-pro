@@ -125,29 +125,70 @@ export async function obtenerCotizacionBROU(): Promise<CotizacionBROU | null> {
     // Fuente 1: Intentar obtener desde la página del BROU (scraping)
     try {
       const brouResponse = await fetch('https://www.brou.com.uy/web/guest/cotizaciones', {
-        next: { revalidate: 3600 }, // Cache por 1 hora
+        next: { revalidate: 0 }, // Sin cache para obtener siempre el valor más reciente
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'es-ES,es;q=0.9',
         },
       })
       
       if (brouResponse.ok) {
         const html = await brouResponse.text()
-        // Buscar patrones comunes en la página del BROU
-        // El BROU muestra la cotización en formato específico
-        const compraMatch = html.match(/compra.*?(\d+[.,]\d+)/i)
-        const ventaMatch = html.match(/venta.*?(\d+[.,]\d+)/i)
         
-        if (compraMatch && ventaMatch) {
-          const compra = parseFloat(compraMatch[1].replace(',', '.'))
-          const venta = parseFloat(ventaMatch[1].replace(',', '.'))
+        // Buscar específicamente "Dólar eBROU" que es la cotización preferencial
+        // Formato esperado: "Dólar eBROU" seguido de valores de compra y venta
+        const dolareBROUSection = html.match(/Dólar\s+eBROU[\s\S]{0,500}?(\d+[.,]\d+)[\s\S]{0,200}?(\d+[.,]\d+)/i)
+        
+        if (dolareBROUSection) {
+          // Intentar extraer compra y venta del Dólar eBROU
+          const valores = html.match(/Dólar\s+eBROU[\s\S]*?(\d+[.,]\d{5})[\s\S]*?(\d+[.,]\d{5})/i)
+          if (valores && valores.length >= 3) {
+            const compra = parseFloat(valores[1].replace(',', '.'))
+            const venta = parseFloat(valores[2].replace(',', '.'))
+            
+            if (compra > 30 && compra < 50 && venta > 30 && venta < 50 && venta > compra) {
+              console.log('[COTIZACION] Obtenida desde BROU web (Dólar eBROU):', { compra, venta })
+              return {
+                compra,
+                venta,
+                fecha: new Date().toISOString().split('T')[0],
+                fuente: 'BROU (web oficial - Dólar eBROU)',
+              }
+            }
+          }
+        }
+        
+        // Si no encontramos Dólar eBROU, buscar Dólar regular
+        const dolarSection = html.match(/Dólar[\s\S]{0,500}?(\d+[.,]\d{5})[\s\S]{0,200}?(\d+[.,]\d{5})/i)
+        if (dolarSection && dolarSection.length >= 3) {
+          const compra = parseFloat(dolarSection[1].replace(',', '.'))
+          const venta = parseFloat(dolarSection[2].replace(',', '.'))
           
-          if (compra > 35 && compra < 45 && venta > 35 && venta < 45 && venta > compra) {
+          if (compra > 30 && compra < 50 && venta > 30 && venta < 50 && venta > compra) {
+            console.log('[COTIZACION] Obtenida desde BROU web (Dólar regular):', { compra, venta })
             return {
               compra,
               venta,
               fecha: new Date().toISOString().split('T')[0],
-              fuente: 'BROU (web oficial)',
+              fuente: 'BROU (web oficial - Dólar)',
+            }
+          }
+        }
+        
+        // Buscar en formato de tabla HTML
+        const tableMatch = html.match(/<td[^>]*>(\d+[.,]\d{5})<\/td>\s*<td[^>]*>(\d+[.,]\d{5})<\/td>/i)
+        if (tableMatch && tableMatch.length >= 3) {
+          const compra = parseFloat(tableMatch[1].replace(',', '.'))
+          const venta = parseFloat(tableMatch[2].replace(',', '.'))
+          
+          if (compra > 30 && compra < 50 && venta > 30 && venta < 50 && venta > compra) {
+            console.log('[COTIZACION] Obtenida desde BROU web (formato tabla):', { compra, venta })
+            return {
+              compra,
+              venta,
+              fecha: new Date().toISOString().split('T')[0],
+              fuente: 'BROU (web oficial - tabla)',
             }
           }
         }
