@@ -23,6 +23,7 @@ model Proveedor {
   minimoCompra  Float?
   rubro         String?
   metodoPago    String?
+  comentario    String?
   pedidos       Pedido[]
   productos     ProductoProveedor[]
   pagosPendientes PagoPendiente[]

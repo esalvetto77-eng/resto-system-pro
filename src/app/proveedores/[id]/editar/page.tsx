@@ -45,6 +45,7 @@ export default function EditarProveedorPage({
     rubro: '',
     minimoCompra: 0,
     metodoPago: '',
+    comentario: '',
     diasPedido: [] as string[],
     horarioPedido: '',
     diasEntrega: [] as string[],
@@ -74,6 +75,7 @@ export default function EditarProveedorPage({
           rubro: data.rubro || '',
           minimoCompra: data.minimoCompra || 0,
           metodoPago: data.metodoPago || '',
+          comentario: data.comentario || '',
           diasPedido: parseJSON<string[]>(data.diasPedido, []),
           horarioPedido: data.horarioPedido || '',
           diasEntrega: parseJSON<string[]>(data.diasEntrega, []),
@@ -267,6 +269,24 @@ export default function EditarProveedorPage({
                   }
                   placeholder="Ej: Crédito a 30 días, Transferencia, Efectivo, A factura vencida, etc."
                 />
+              </div>
+              <div className="md:col-span-2">
+                <label className="label">Comentario</label>
+                <textarea
+                  className="input"
+                  rows={3}
+                  value={formData.comentario}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      comentario: e.target.value,
+                    })
+                  }
+                  placeholder="Ej: Número para pedidos: 099123456, Horario especial: Lunes a Viernes 8-18hs, etc."
+                />
+                <p className="text-xs text-neutral-500 mt-1">
+                  Información adicional como número para pedidos, horarios especiales, etc.
+                </p>
               </div>
             </div>
           </div>

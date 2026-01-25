@@ -21,6 +21,7 @@ interface ProveedorDetailClientProps {
     rubro: string | null
     minimoCompra: number | null
     metodoPago: string | null
+    comentario: string | null
     productos: Array<{
       id: string
       precioCompra: number | null
@@ -139,6 +140,16 @@ export function ProveedorDetailPageClient({ proveedor }: ProveedorDetailClientPr
                   </div>
                   <div className="text-base text-neutral-900">
                     {proveedor.direccion}
+                  </div>
+                </div>
+              )}
+              {proveedor.comentario && (
+                <div>
+                  <div className="text-sm font-medium text-neutral-500">
+                    Comentario
+                  </div>
+                  <div className="text-base text-neutral-900 whitespace-pre-wrap">
+                    {proveedor.comentario}
                   </div>
                 </div>
               )}

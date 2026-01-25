@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
         rubro: toStringOrNull(body.rubro),
         minimoCompra: toNumberOrNull(body.minimoCompra),
         metodoPago: toStringOrNull(body.metodoPago),
+        comentario: toStringOrNull(body.comentario),
         diasPedido: handleDiasField(body.diasPedido),
         horarioPedido: toStringOrNull(body.horarioPedido),
         diasEntrega: handleDiasField(body.diasEntrega),
