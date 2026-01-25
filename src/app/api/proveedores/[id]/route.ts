@@ -133,10 +133,24 @@ export async function PUT(
       )
     }
 
-    // Verificar que el proveedor existe
-    const proveedorExistente = await prisma.proveedor.findUnique({
-      where: { id: params.id },
-    })
+    // Verificar que el proveedor existe (sin incluir comentario para evitar errores)
+    let proveedorExistente: any
+    try {
+      proveedorExistente = await prisma.proveedor.findUnique({
+        where: { id: params.id },
+        select: {
+          id: true,
+          nombre: true,
+          activo: true,
+        },
+      })
+    } catch (error: any) {
+      // Si falla, intentar sin select
+      proveedorExistente = await prisma.proveedor.findUnique({
+        where: { id: params.id },
+      })
+    }
+    
     if (!proveedorExistente) {
       return NextResponse.json(
         { error: 'Proveedor no encontrado' },
