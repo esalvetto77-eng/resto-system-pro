@@ -13,66 +13,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Intentar obtener con select explícito para evitar errores si el campo comentario no existe
-    let proveedor
+    // Intentar obtener el proveedor sin select primero para ver si funciona
+    let proveedor: any
     try {
-      proveedor = await prisma.proveedor.findUnique({
-        where: { id: params.id },
-        select: {
-          id: true,
-          nombre: true,
-          contacto: true,
-          telefono: true,
-          email: true,
-          direccion: true,
-          diasPedido: true,
-          horarioPedido: true,
-          diasEntrega: true,
-          activo: true,
-          rubro: true,
-          minimoCompra: true,
-          metodoPago: true,
-          createdAt: true,
-          updatedAt: true,
-          // No incluir comentario en el select inicial
-        },
-      })
-      
-      if (!proveedor) {
-        return NextResponse.json(
-          { error: 'Proveedor no encontrado' },
-          { status: 404 }
-        )
-      }
-      
-      // Intentar obtener el comentario con una consulta raw si el campo existe
-      try {
-        const resultado = await prisma.$queryRawUnsafe<Array<{comentario: string | null}>>(
-          `SELECT comentario FROM proveedores WHERE id = $1`,
-          params.id
-        )
-        if (resultado && resultado.length > 0) {
-          proveedor = {
-            ...proveedor,
-            comentario: resultado[0].comentario,
-          }
-        } else {
-          proveedor = {
-            ...proveedor,
-            comentario: null,
-          }
-        }
-      } catch (comentarioError: any) {
-        // Si el campo comentario no existe, simplemente agregar null
-        console.log('[API PROVEEDOR] Campo comentario no existe aún, usando null')
-        proveedor = {
-          ...proveedor,
-          comentario: null,
-        }
-      }
-    } catch (selectError: any) {
-      // Si falla el select, intentar sin select (incluir todos los campos)
-      console.log('[API PROVEEDOR] Error con select, intentando sin select:', selectError?.message)
       proveedor = await prisma.proveedor.findUnique({
         where: { id: params.id },
       })
@@ -85,11 +28,81 @@ export async function GET(
       }
       
       // Si el proveedor no tiene comentario, agregarlo como null
-      if (!('comentario' in proveedor)) {
-        proveedor = {
-          ...proveedor,
-          comentario: null,
+      if (!('comentario' in proveedor) || proveedor.comentario === undefined) {
+        // Intentar obtener el comentario con una consulta raw si el campo existe
+        try {
+          const resultado = await prisma.$queryRawUnsafe<Array<{comentario: string | null}>>(
+            `SELECT comentario FROM proveedores WHERE id = $1`,
+            params.id
+          )
+          if (resultado && resultado.length > 0) {
+            proveedor.comentario = resultado[0].comentario
+          } else {
+            proveedor.comentario = null
+          }
+        } catch (comentarioError: any) {
+          // Si el campo comentario no existe, simplemente agregar null
+          console.log('[API PROVEEDOR] Campo comentario no existe aún, usando null')
+          proveedor.comentario = null
         }
+      }
+    } catch (error: any) {
+      // Si falla porque el campo comentario no existe, intentar con select explícito
+      if (error?.message?.includes('comentario') || error?.code === 'P2022') {
+        console.log('[API PROVEEDOR] Error con comentario, intentando sin ese campo:', error?.message)
+        try {
+          const proveedorSinComentario = await prisma.proveedor.findUnique({
+            where: { id: params.id },
+            select: {
+              id: true,
+              nombre: true,
+              contacto: true,
+              telefono: true,
+              email: true,
+              direccion: true,
+              diasPedido: true,
+              horarioPedido: true,
+              diasEntrega: true,
+              activo: true,
+              rubro: true,
+              minimoCompra: true,
+              metodoPago: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          })
+          
+          if (!proveedorSinComentario) {
+            return NextResponse.json(
+              { error: 'Proveedor no encontrado' },
+              { status: 404 }
+            )
+          }
+          
+          // Convertir a objeto plano y agregar comentario
+          proveedor = {
+            id: proveedorSinComentario.id,
+            nombre: proveedorSinComentario.nombre,
+            contacto: proveedorSinComentario.contacto,
+            telefono: proveedorSinComentario.telefono,
+            email: proveedorSinComentario.email,
+            direccion: proveedorSinComentario.direccion,
+            diasPedido: proveedorSinComentario.diasPedido,
+            horarioPedido: proveedorSinComentario.horarioPedido,
+            diasEntrega: proveedorSinComentario.diasEntrega,
+            activo: proveedorSinComentario.activo,
+            rubro: proveedorSinComentario.rubro,
+            minimoCompra: proveedorSinComentario.minimoCompra,
+            metodoPago: proveedorSinComentario.metodoPago,
+            comentario: null,
+            createdAt: proveedorSinComentario.createdAt,
+            updatedAt: proveedorSinComentario.updatedAt,
+          }
+        } catch (selectError: any) {
+          throw error // Re-lanzar el error original si también falla el select
+        }
+      } else {
+        throw error // Re-lanzar si es otro tipo de error
       }
     }
 
