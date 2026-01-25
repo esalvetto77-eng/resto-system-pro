@@ -194,7 +194,21 @@ export async function PUT(
       return null
     }
 
-    // Construir el objeto de datos sin comentario primero
+    // Verificar si el campo comentario existe en la BD antes de intentar actualizarlo
+    let campoComentarioExiste = false
+    try {
+      await prisma.$queryRawUnsafe(
+        `SELECT comentario FROM proveedores WHERE id = $1 LIMIT 1`,
+        params.id
+      )
+      campoComentarioExiste = true
+      console.log('[API PROVEEDOR PUT] Campo comentario existe en BD')
+    } catch (error: any) {
+      console.log('[API PROVEEDOR PUT] Campo comentario NO existe en BD, actualizando sin ese campo')
+      campoComentarioExiste = false
+    }
+    
+    // Construir el objeto de datos
     const dataToUpdate: any = {
       nombre: body.nombre.trim(),
       contacto: toStringOrNull(body.contacto),
@@ -210,45 +224,33 @@ export async function PUT(
       activo: body.activo !== undefined ? Boolean(body.activo) : proveedorExistente.activo,
     }
     
-    // Intentar actualizar con comentario primero
-    let proveedor
-    try {
+    // Solo incluir comentario si el campo existe en la BD
+    if (campoComentarioExiste) {
       dataToUpdate.comentario = toStringOrNull(body.comentario)
-      proveedor = await prisma.proveedor.update({
-        where: { id: params.id },
-        data: dataToUpdate,
-      })
-    } catch (error: any) {
-      // Si falla porque el campo comentario no existe, actualizar sin ese campo
-      if (error?.code === 'P2022' || error?.message?.includes('comentario') || error?.message?.includes('does not exist')) {
-        console.log('[API PROVEEDOR PUT] Campo comentario no existe aún, actualizando sin ese campo')
-        delete dataToUpdate.comentario
-        
-        proveedor = await prisma.proveedor.update({
-          where: { id: params.id },
-          data: dataToUpdate,
-        })
-        
-        // Si el comentario tiene valor, intentar actualizarlo con SQL directo
-        if (body.comentario && toStringOrNull(body.comentario)) {
-          try {
-            await prisma.$executeRawUnsafe(
-              `UPDATE proveedores SET comentario = $1 WHERE id = $2`,
-              toStringOrNull(body.comentario),
-              params.id
-            )
-            // Agregar comentario al objeto de respuesta
-            proveedor = {
-              ...proveedor,
-              comentario: toStringOrNull(body.comentario),
-            }
-          } catch (sqlError: any) {
-            console.log('[API PROVEEDOR PUT] No se pudo actualizar comentario con SQL, el campo no existe en BD')
-            // El campo no existe, simplemente continuar sin él
-          }
-        }
-      } else {
-        throw error // Re-lanzar si es otro tipo de error
+    }
+    
+    // Actualizar el proveedor
+    const proveedor = await prisma.proveedor.update({
+      where: { id: params.id },
+      data: dataToUpdate,
+    })
+    
+    // Si el comentario tiene valor pero el campo no existe, intentar actualizarlo con SQL directo
+    // (esto no debería pasar, pero por si acaso)
+    if (!campoComentarioExiste && body.comentario && toStringOrNull(body.comentario)) {
+      try {
+        await prisma.$executeRawUnsafe(
+          `ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS comentario TEXT`
+        )
+        await prisma.$executeRawUnsafe(
+          `UPDATE proveedores SET comentario = $1 WHERE id = $2`,
+          toStringOrNull(body.comentario),
+          params.id
+        )
+        console.log('[API PROVEEDOR PUT] Campo comentario agregado y actualizado con SQL')
+      } catch (sqlError: any) {
+        console.log('[API PROVEEDOR PUT] No se pudo agregar/actualizar comentario con SQL:', sqlError?.message)
+        // Continuar sin el campo
       }
     }
 
