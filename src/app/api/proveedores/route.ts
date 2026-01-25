@@ -9,14 +9,65 @@ export const dynamic = 'force-dynamic'
 // GET: Listar todos los proveedores
 export async function GET() {
   try {
-    const proveedores = await prisma.proveedor.findMany({
-      where: { activo: true },
-      orderBy: { nombre: 'asc' },
-    })
+    // Intentar obtener proveedores con select explícito para evitar errores si el campo comentario no existe
+    let proveedores
+    try {
+      proveedores = await prisma.proveedor.findMany({
+        where: { activo: true },
+        orderBy: { nombre: 'asc' },
+        select: {
+          id: true,
+          nombre: true,
+          contacto: true,
+          telefono: true,
+          email: true,
+          direccion: true,
+          diasPedido: true,
+          horarioPedido: true,
+          diasEntrega: true,
+          activo: true,
+          rubro: true,
+          minimoCompra: true,
+          metodoPago: true,
+          createdAt: true,
+          updatedAt: true,
+          // Intentar incluir comentario, pero no fallar si no existe
+        },
+      })
+      
+      // Si el campo comentario existe, intentar leerlo con una consulta raw
+      try {
+        const proveedoresConComentario = await prisma.$queryRawUnsafe<Array<{id: string, comentario: string | null}>>(
+          `SELECT id, comentario FROM proveedores WHERE activo = true ORDER BY nombre ASC`
+        )
+        
+        // Mapear comentarios a los proveedores
+        const comentariosMap = new Map(proveedoresConComentario.map(p => [p.id, p.comentario]))
+        proveedores = proveedores.map(p => ({
+          ...p,
+          comentario: comentariosMap.get(p.id) || null,
+        }))
+      } catch (comentarioError: any) {
+        // Si el campo comentario no existe, simplemente agregar null
+        console.log('[API PROVEEDORES] Campo comentario no existe aún, usando null')
+        proveedores = proveedores.map(p => ({
+          ...p,
+          comentario: null,
+        }))
+      }
+    } catch (selectError: any) {
+      // Si falla el select, intentar sin select (incluir todos los campos)
+      console.log('[API PROVEEDORES] Error con select, intentando sin select:', selectError?.message)
+      proveedores = await prisma.proveedor.findMany({
+        where: { activo: true },
+        orderBy: { nombre: 'asc' },
+      })
+    }
     
     return NextResponse.json(proveedores)
   } catch (error: any) {
     console.error('Error en GET /api/proveedores:', error?.message || String(error))
+    console.error('Stack trace:', error?.stack)
     return NextResponse.json([])
   }
 }
