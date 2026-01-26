@@ -246,125 +246,44 @@ export async function PUT(
     // NO incluir campos adicionales en Prisma - se actualizarán con SQL directo
     // Esto evita problemas de mapeo camelCase/snake_case
     
-    // Actualizar el proveedor con Prisma (solo campos básicos)
-    let proveedor: any
-    try {
-      proveedor = await prisma.proveedor.update({
-        where: { id: params.id },
-        data: dataToUpdate,
-      })
+    // Actualizar el proveedor con Prisma (solo campos básicos - siempre funciona)
+    const proveedor = await prisma.proveedor.update({
+      where: { id: params.id },
+      data: dataToUpdate,
+    })
+    
+    // Actualizar campos adicionales con SQL directo (usando nombres exactos de columnas)
+    // Esto evita problemas de mapeo Prisma cuando las columnas fueron agregadas manualmente
+    if (tieneComentario || tieneNumeroCuenta || tieneBanco) {
+      const updatesAdicionales: string[] = []
+      const valores: any[] = []
       
-      // Después de actualizar con Prisma, actualizar campos adicionales con SQL directo
-      if (tieneComentario || tieneNumeroCuenta || tieneBanco) {
-        const updatesAdicionales: string[] = []
-        const valores: any[] = []
-        
-        if (tieneComentario) {
-          updatesAdicionales.push('comentario = $' + (valores.length + 1))
-          valores.push(toStringOrNull(body.comentario))
-        }
-        if (tieneNumeroCuenta) {
-          updatesAdicionales.push('numero_cuenta = $' + (valores.length + 1))
-          valores.push(toStringOrNull(body.numeroCuenta))
-        }
-        if (tieneBanco) {
-          updatesAdicionales.push('banco = $' + (valores.length + 1))
-          valores.push(toStringOrNull(body.banco))
-        }
-        
-        if (updatesAdicionales.length > 0) {
-          valores.push(params.id)
+      if (tieneComentario) {
+        updatesAdicionales.push('comentario = $' + (valores.length + 1))
+        valores.push(toStringOrNull(body.comentario))
+      }
+      if (tieneNumeroCuenta) {
+        updatesAdicionales.push('numero_cuenta = $' + (valores.length + 1))
+        valores.push(toStringOrNull(body.numeroCuenta))
+      }
+      if (tieneBanco) {
+        updatesAdicionales.push('banco = $' + (valores.length + 1))
+        valores.push(toStringOrNull(body.banco))
+      }
+      
+      if (updatesAdicionales.length > 0) {
+        valores.push(params.id)
+        try {
           await prisma.$executeRawUnsafe(
             `UPDATE proveedores SET ${updatesAdicionales.join(', ')} WHERE id = $${valores.length}`,
             ...valores
           )
           console.log('[API PROVEEDOR PUT] Campos adicionales actualizados con SQL directo')
+        } catch (sqlError: any) {
+          // Si falla, loguear pero no fallar toda la operación
+          console.log('[API PROVEEDOR PUT] Error al actualizar campos adicionales (continuando):', sqlError?.message)
         }
       }
-    } catch (prismaError: any) {
-      // Si Prisma falla, obtener los nombres reales de las columnas y usar SQL directo
-      console.log('[API PROVEEDOR PUT] Prisma falló, obteniendo nombres de columnas y usando SQL directo:', prismaError?.message)
-      
-      // Obtener los nombres reales de las columnas de la base de datos
-      const columnas = await prisma.$queryRawUnsafe<Array<{column_name: string}>>(
-        `SELECT column_name 
-         FROM information_schema.columns 
-         WHERE table_name = 'proveedores' 
-         AND column_name IN ('nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'minimo_compra', 'minimocompra', 'metodo_pago', 'metodopago', 'dias_pedido', 'diaspedido', 'horario_pedido', 'horariopedido', 'dias_entrega', 'diasentrega', 'activo', 'updated_at', 'updatedat')
-         ORDER BY column_name`
-      )
-      
-      const nombresColumnas = columnas.map(c => c.column_name)
-      const minimoCompraCol = nombresColumnas.find(c => c.toLowerCase().includes('minimo') && c.toLowerCase().includes('compra')) || 'minimoCompra'
-      const metodoPagoCol = nombresColumnas.find(c => c.toLowerCase().includes('metodo') && c.toLowerCase().includes('pago')) || 'metodoPago'
-      const diasPedidoCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('pedido')) || 'diasPedido'
-      const horarioPedidoCol = nombresColumnas.find(c => c.toLowerCase().includes('horario') && c.toLowerCase().includes('pedido')) || 'horarioPedido'
-      const diasEntregaCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega')) || 'diasEntrega'
-      const updatedAtCol = nombresColumnas.find(c => c.toLowerCase().includes('updated')) || 'updatedAt'
-      
-      // Construir el UPDATE con los nombres reales de las columnas
-      await prisma.$executeRawUnsafe(
-        `UPDATE proveedores SET 
-          nombre = $1, 
-          contacto = $2, 
-          telefono = $3, 
-          email = $4, 
-          direccion = $5, 
-          rubro = $6, 
-          ${minimoCompraCol} = $7, 
-          ${metodoPagoCol} = $8, 
-          ${diasPedidoCol} = $9, 
-          ${horarioPedidoCol} = $10, 
-          ${diasEntregaCol} = $11, 
-          activo = $12,
-          ${updatedAtCol} = NOW()
-         WHERE id = $13`,
-        dataToUpdate.nombre,
-        dataToUpdate.contacto,
-        dataToUpdate.telefono,
-        dataToUpdate.email,
-        dataToUpdate.direccion,
-        dataToUpdate.rubro,
-        dataToUpdate.minimoCompra,
-        dataToUpdate.metodoPago,
-        dataToUpdate.diasPedido,
-        dataToUpdate.horarioPedido,
-        dataToUpdate.diasEntrega,
-        dataToUpdate.activo,
-        params.id
-      )
-      
-      // Actualizar campos adicionales si existen
-      if (tieneComentario || tieneNumeroCuenta || tieneBanco) {
-        const updatesAdicionales: string[] = []
-        const valores: any[] = []
-        
-        if (tieneComentario) {
-          updatesAdicionales.push('comentario = $' + (valores.length + 1))
-          valores.push(toStringOrNull(body.comentario))
-        }
-        if (tieneNumeroCuenta) {
-          updatesAdicionales.push('numero_cuenta = $' + (valores.length + 1))
-          valores.push(toStringOrNull(body.numeroCuenta))
-        }
-        if (tieneBanco) {
-          updatesAdicionales.push('banco = $' + (valores.length + 1))
-          valores.push(toStringOrNull(body.banco))
-        }
-        
-        if (updatesAdicionales.length > 0) {
-          valores.push(params.id)
-          await prisma.$executeRawUnsafe(
-            `UPDATE proveedores SET ${updatesAdicionales.join(', ')} WHERE id = $${valores.length}`,
-            ...valores
-          )
-        }
-      }
-      
-      // Obtener el proveedor actualizado
-      proveedor = await prisma.proveedor.findUnique({
-        where: { id: params.id },
-      })
     }
 
     return NextResponse.json(proveedor)
