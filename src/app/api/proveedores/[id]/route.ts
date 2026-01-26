@@ -205,21 +205,28 @@ export async function PUT(
       return null
     }
 
-    // Verificar si los campos adicionales existen en la BD antes de intentar actualizarlos
-    let camposAdicionalesExisten = false
+    // Verificar qué campos adicionales existen en la BD
+    let tieneComentario = false
+    let tieneNumeroCuenta = false
+    let tieneBanco = false
+    
     try {
-      await prisma.$queryRawUnsafe(
-        `SELECT comentario, numero_cuenta, banco FROM proveedores WHERE id = $1 LIMIT 1`,
-        params.id
+      const columnas = await prisma.$queryRawUnsafe<Array<{column_name: string}>>(
+        `SELECT column_name 
+         FROM information_schema.columns 
+         WHERE table_name = 'proveedores' 
+         AND column_name IN ('comentario', 'numero_cuenta', 'banco')`
       )
-      camposAdicionalesExisten = true
-      console.log('[API PROVEEDOR PUT] Campos adicionales existen en BD')
+      const nombresColumnas = columnas.map(c => c.column_name)
+      tieneComentario = nombresColumnas.includes('comentario')
+      tieneNumeroCuenta = nombresColumnas.includes('numero_cuenta')
+      tieneBanco = nombresColumnas.includes('banco')
+      console.log('[API PROVEEDOR PUT] Campos existentes:', { tieneComentario, tieneNumeroCuenta, tieneBanco })
     } catch (error: any) {
-      console.log('[API PROVEEDOR PUT] Campos adicionales NO existen en BD, actualizando sin esos campos')
-      camposAdicionalesExisten = false
+      console.log('[API PROVEEDOR PUT] Error al verificar campos (continuando sin ellos):', error?.message)
     }
     
-    // Construir el objeto de datos
+    // Construir el objeto de datos solo con campos que existen
     const dataToUpdate: any = {
       nombre: body.nombre.trim(),
       contacto: toStringOrNull(body.contacto),
@@ -236,42 +243,106 @@ export async function PUT(
     }
     
     // Solo incluir campos adicionales si existen en la BD
-    if (camposAdicionalesExisten) {
+    if (tieneComentario) {
       dataToUpdate.comentario = toStringOrNull(body.comentario)
+    }
+    if (tieneNumeroCuenta) {
       dataToUpdate.numeroCuenta = toStringOrNull(body.numeroCuenta)
+    }
+    if (tieneBanco) {
       dataToUpdate.banco = toStringOrNull(body.banco)
     }
     
-    // Actualizar el proveedor
-    const proveedor = await prisma.proveedor.update({
-      where: { id: params.id },
-      data: dataToUpdate,
-    })
-    
-    // Si los campos adicionales tienen valor pero no existen, intentar actualizarlos con SQL directo
-    // (esto no debería pasar, pero por si acaso)
-    if (!camposAdicionalesExisten && (body.comentario || body.numeroCuenta || body.banco)) {
-      try {
-        await prisma.$executeRawUnsafe(
-          `ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS comentario TEXT`
-        )
-        await prisma.$executeRawUnsafe(
-          `ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS numero_cuenta TEXT`
-        )
-        await prisma.$executeRawUnsafe(
-          `ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS banco TEXT`
-        )
-        await prisma.$executeRawUnsafe(
-          `UPDATE proveedores SET comentario = $1, numero_cuenta = $2, banco = $3 WHERE id = $4`,
-          toStringOrNull(body.comentario),
-          toStringOrNull(body.numeroCuenta),
-          toStringOrNull(body.banco),
-          params.id
-        )
-        console.log('[API PROVEEDOR PUT] Campos adicionales agregados y actualizados con SQL')
-      } catch (sqlError: any) {
-        console.log('[API PROVEEDOR PUT] No se pudo agregar/actualizar campos adicionales con SQL:', sqlError?.message)
-        // Continuar sin los campos
+    // Actualizar el proveedor con Prisma (solo campos que existen)
+    let proveedor: any
+    try {
+      proveedor = await prisma.proveedor.update({
+        where: { id: params.id },
+        data: dataToUpdate,
+      })
+    } catch (prismaError: any) {
+      // Si Prisma falla porque intenta usar campos que no existen, usar SQL directo
+      if (prismaError?.message?.includes('numero_cuenta') || prismaError?.message?.includes('banco') || prismaError?.message?.includes('comentario')) {
+        console.log('[API PROVEEDOR PUT] Prisma falló con campos adicionales, usando SQL directo')
+        
+        // Actualizar campos básicos primero usando Prisma con select explícito
+        // Esto evita problemas con campos que no existen
+        const camposBasicos: any = {
+          nombre: dataToUpdate.nombre,
+          contacto: dataToUpdate.contacto,
+          telefono: dataToUpdate.telefono,
+          email: dataToUpdate.email,
+          direccion: dataToUpdate.direccion,
+          rubro: dataToUpdate.rubro,
+          minimoCompra: dataToUpdate.minimoCompra,
+          metodoPago: dataToUpdate.metodoPago,
+          diasPedido: dataToUpdate.diasPedido,
+          horarioPedido: dataToUpdate.horarioPedido,
+          diasEntrega: dataToUpdate.diasEntrega,
+          activo: dataToUpdate.activo,
+        }
+        
+        await prisma.proveedor.update({
+          where: { id: params.id },
+          data: camposBasicos,
+        })
+        
+        // Luego actualizar campos adicionales si existen o crearlos si no existen
+        if (!tieneComentario && body.comentario) {
+          try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS comentario TEXT`)
+            tieneComentario = true
+          } catch (e: any) {
+            console.log('[API PROVEEDOR PUT] No se pudo agregar columna comentario:', e?.message)
+          }
+        }
+        if (!tieneNumeroCuenta && body.numeroCuenta) {
+          try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS numero_cuenta TEXT`)
+            tieneNumeroCuenta = true
+          } catch (e: any) {
+            console.log('[API PROVEEDOR PUT] No se pudo agregar columna numero_cuenta:', e?.message)
+          }
+        }
+        if (!tieneBanco && body.banco) {
+          try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS banco TEXT`)
+            tieneBanco = true
+          } catch (e: any) {
+            console.log('[API PROVEEDOR PUT] No se pudo agregar columna banco:', e?.message)
+          }
+        }
+        
+        // Actualizar campos adicionales si ahora existen
+        const updatesAdicionales: string[] = []
+        const valores: any[] = []
+        if (tieneComentario) {
+          updatesAdicionales.push('comentario = $' + (valores.length + 1))
+          valores.push(toStringOrNull(body.comentario))
+        }
+        if (tieneNumeroCuenta) {
+          updatesAdicionales.push('numero_cuenta = $' + (valores.length + 1))
+          valores.push(toStringOrNull(body.numeroCuenta))
+        }
+        if (tieneBanco) {
+          updatesAdicionales.push('banco = $' + (valores.length + 1))
+          valores.push(toStringOrNull(body.banco))
+        }
+        
+        if (updatesAdicionales.length > 0) {
+          valores.push(params.id)
+          await prisma.$executeRawUnsafe(
+            `UPDATE proveedores SET ${updatesAdicionales.join(', ')} WHERE id = $${valores.length}`,
+            ...valores
+          )
+        }
+        
+        // Obtener el proveedor actualizado
+        proveedor = await prisma.proveedor.findUnique({
+          where: { id: params.id },
+        })
+      } else {
+        throw prismaError
       }
     }
 
