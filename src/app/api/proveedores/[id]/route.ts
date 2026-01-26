@@ -330,10 +330,52 @@ export async function PUT(
       )
       console.log('[API PROVEEDOR PUT] Actualizado con SQL directo (incluyendo campos adicionales)')
       
-      // Obtener el proveedor actualizado
+      // Obtener el proveedor actualizado usando select explícito para evitar campos que no existen
       proveedor = await prisma.proveedor.findUnique({
         where: { id: params.id },
+        select: {
+          id: true,
+          nombre: true,
+          contacto: true,
+          telefono: true,
+          email: true,
+          direccion: true,
+          rubro: true,
+          minimoCompra: true,
+          metodoPago: true,
+          diasPedido: true,
+          horarioPedido: true,
+          diasEntrega: true,
+          activo: true,
+          createdAt: true,
+          updatedAt: true,
+          // NO incluir campos adicionales aquí - se agregarán con SQL si existen
+        },
       })
+      
+      // Agregar campos adicionales con SQL si existen
+      if (tieneComentario || tieneNumeroCuenta || tieneBanco) {
+        try {
+          const camposAdicionales = await prisma.$queryRawUnsafe<Array<{
+            comentario: string | null,
+            numero_cuenta: string | null,
+            banco: string | null
+          }>>(
+            `SELECT comentario, numero_cuenta, banco FROM proveedores WHERE id = $1`,
+            params.id
+          )
+          if (camposAdicionales && camposAdicionales.length > 0) {
+            proveedor = {
+              ...proveedor,
+              comentario: camposAdicionales[0].comentario,
+              numeroCuenta: camposAdicionales[0].numero_cuenta,
+              banco: camposAdicionales[0].banco,
+            }
+          }
+        } catch (error: any) {
+          console.log('[API PROVEEDOR PUT] Error al obtener campos adicionales (continuando):', error?.message)
+        }
+      }
     } else {
       // Si no hay campos adicionales, usar Prisma normalmente
       proveedor = await prisma.proveedor.update({
