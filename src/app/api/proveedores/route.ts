@@ -55,16 +55,6 @@ export async function GET() {
             banco: p.banco
           }
         ]))
-        
-        // Mapear campos adicionales a los proveedores
-        const camposMap = new Map(proveedoresConCamposAdicionales.map(p => [
-          p.id, 
-          {
-            comentario: p.comentario,
-            numeroCuenta: p.numeroCuenta,
-            banco: p.banco
-          }
-        ]))
         proveedores = proveedores.map(p => {
           const campos = camposMap.get(p.id) || { comentario: null, numeroCuenta: null, banco: null }
           return {
