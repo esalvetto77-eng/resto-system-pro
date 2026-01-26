@@ -267,7 +267,7 @@ export async function PUT(
       updates.push('rubro = $' + (valores.length + 1))
       valores.push(dataToUpdate.rubro)
       
-      // Campos que pueden tener nombres diferentes - usar los que existen
+      // Campos que pueden tener nombres diferentes - usar SOLO los que existen
       const columnasBasicas = await prisma.$queryRawUnsafe<Array<{column_name: string}>>(
         `SELECT column_name FROM information_schema.columns 
          WHERE table_name = 'proveedores' 
@@ -275,26 +275,39 @@ export async function PUT(
       )
       const nombresBasicos = columnasBasicas.map(c => c.column_name)
       
-      const minimoCompraCol = nombresBasicos.find(c => c.toLowerCase().includes('minimo') && c.toLowerCase().includes('compra')) || 'minimoCompra'
-      const metodoPagoCol = nombresBasicos.find(c => c.toLowerCase().includes('metodo') && c.toLowerCase().includes('pago')) || 'metodoPago'
-      const diasPedidoCol = nombresBasicos.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('pedido')) || 'diasPedido'
-      const horarioPedidoCol = nombresBasicos.find(c => c.toLowerCase().includes('horario') && c.toLowerCase().includes('pedido')) || 'horarioPedido'
-      const diasEntregaCol = nombresBasicos.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega')) || 'diasEntrega'
-      const updatedAtCol = nombresBasicos.find(c => c.toLowerCase().includes('updated')) || 'updatedAt'
+      const minimoCompraCol = nombresBasicos.find(c => c.toLowerCase().includes('minimo') && c.toLowerCase().includes('compra'))
+      const metodoPagoCol = nombresBasicos.find(c => c.toLowerCase().includes('metodo') && c.toLowerCase().includes('pago'))
+      const diasPedidoCol = nombresBasicos.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('pedido'))
+      const horarioPedidoCol = nombresBasicos.find(c => c.toLowerCase().includes('horario') && c.toLowerCase().includes('pedido'))
+      const diasEntregaCol = nombresBasicos.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega'))
+      const updatedAtCol = nombresBasicos.find(c => c.toLowerCase().includes('updated'))
       
-      updates.push(`${minimoCompraCol} = $${valores.length + 1}`)
-      valores.push(dataToUpdate.minimoCompra)
-      updates.push(`${metodoPagoCol} = $${valores.length + 1}`)
-      valores.push(dataToUpdate.metodoPago)
-      updates.push(`${diasPedidoCol} = $${valores.length + 1}`)
-      valores.push(dataToUpdate.diasPedido)
-      updates.push(`${horarioPedidoCol} = $${valores.length + 1}`)
-      valores.push(dataToUpdate.horarioPedido)
-      updates.push(`${diasEntregaCol} = $${valores.length + 1}`)
-      valores.push(dataToUpdate.diasEntrega)
+      // Solo agregar campos si existen en la BD
+      if (minimoCompraCol) {
+        updates.push(`${minimoCompraCol} = $${valores.length + 1}`)
+        valores.push(dataToUpdate.minimoCompra)
+      }
+      if (metodoPagoCol) {
+        updates.push(`${metodoPagoCol} = $${valores.length + 1}`)
+        valores.push(dataToUpdate.metodoPago)
+      }
+      if (diasPedidoCol) {
+        updates.push(`${diasPedidoCol} = $${valores.length + 1}`)
+        valores.push(dataToUpdate.diasPedido)
+      }
+      if (horarioPedidoCol) {
+        updates.push(`${horarioPedidoCol} = $${valores.length + 1}`)
+        valores.push(dataToUpdate.horarioPedido)
+      }
+      if (diasEntregaCol) {
+        updates.push(`${diasEntregaCol} = $${valores.length + 1}`)
+        valores.push(dataToUpdate.diasEntrega)
+      }
       updates.push(`activo = $${valores.length + 1}`)
       valores.push(dataToUpdate.activo)
-      updates.push(`${updatedAtCol} = NOW()`)
+      if (updatedAtCol) {
+        updates.push(`${updatedAtCol} = NOW()`)
+      }
       
       // Campos adicionales
       if (tieneComentario) {
