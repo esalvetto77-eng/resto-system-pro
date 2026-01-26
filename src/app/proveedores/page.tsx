@@ -23,6 +23,7 @@ interface Proveedor {
   rubro: string | null
   minimoCompra: number | null
   metodoPago: string | null
+  comentario: string | null
 }
 
 export default function ProveedoresPage() {
@@ -156,6 +157,7 @@ export default function ProveedoresPage() {
                   <TableCell header>Rubro</TableCell>
                   <TableCell header>Días de Pedido</TableCell>
                   <TableCell header>Método de Pago</TableCell>
+                  <TableCell header>Comentario</TableCell>
                   <TableCell header>Estado</TableCell>
                   {canEdit() && <TableCell header className="text-right">Acciones</TableCell>}
                 </TableRow>
@@ -224,6 +226,17 @@ export default function ProveedoresPage() {
                           </div>
                         ) : (
                           <span className="text-neutral-400">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {proveedor.comentario ? (
+                          <div className="text-neutral-600 text-sm max-w-xs">
+                            <div className="truncate" title={proveedor.comentario}>
+                              {proveedor.comentario}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-neutral-400 text-sm">-</span>
                         )}
                       </TableCell>
                       <TableCell>
