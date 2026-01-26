@@ -58,25 +58,35 @@ async function getProveedor(id: string) {
       return null
     }
     
-    // Intentar obtener el comentario con SQL raw si el campo existe
+    // Intentar obtener los campos adicionales con SQL raw si existen
     let comentario: string | null = null
+    let numeroCuenta: string | null = null
+    let banco: string | null = null
     try {
-      const resultado = await prisma.$queryRawUnsafe<Array<{comentario: string | null}>>(
-        `SELECT comentario FROM proveedores WHERE id = $1`,
+      const resultado = await prisma.$queryRawUnsafe<Array<{
+        comentario: string | null,
+        numero_cuenta: string | null,
+        banco: string | null
+      }>>(
+        `SELECT comentario, numero_cuenta, banco FROM proveedores WHERE id = $1`,
         id
       )
       if (resultado && resultado.length > 0) {
         comentario = resultado[0].comentario
+        numeroCuenta = resultado[0].numero_cuenta
+        banco = resultado[0].banco
       }
     } catch (error: any) {
-      // Si el campo comentario no existe, simplemente usar null
-      console.log('[PAGE PROVEEDOR] Campo comentario no existe aún, usando null')
+      // Si los campos no existen, simplemente usar null
+      console.log('[PAGE PROVEEDOR] Campos adicionales no existen aún, usando null')
     }
     
-    // Agregar comentario al objeto
+    // Agregar campos adicionales al objeto
     return {
       ...proveedor,
       comentario,
+      numeroCuenta,
+      banco,
     }
   } catch (error: any) {
     // Si falla, intentar sin select (incluir todos los campos)
@@ -116,11 +126,13 @@ async function getProveedor(id: string) {
       return null
     }
     
-    // Si el proveedor no tiene comentario, agregarlo como null
+    // Si el proveedor no tiene campos adicionales, agregarlos como null
     if (!('comentario' in proveedor) || proveedor.comentario === undefined) {
       return {
         ...proveedor,
         comentario: null,
+        numeroCuenta: null,
+        banco: null,
       }
     }
     

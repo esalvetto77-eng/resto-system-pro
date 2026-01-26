@@ -27,23 +27,32 @@ export async function GET(
         )
       }
       
-      // Si el proveedor no tiene comentario, agregarlo como null
+      // Si el proveedor no tiene campos adicionales, intentar obtenerlos con una consulta raw
       if (!('comentario' in proveedor) || proveedor.comentario === undefined) {
-        // Intentar obtener el comentario con una consulta raw si el campo existe
         try {
-          const resultado = await prisma.$queryRawUnsafe<Array<{comentario: string | null}>>(
-            `SELECT comentario FROM proveedores WHERE id = $1`,
+          const resultado = await prisma.$queryRawUnsafe<Array<{
+            comentario: string | null,
+            numero_cuenta: string | null,
+            banco: string | null
+          }>>(
+            `SELECT comentario, numero_cuenta, banco FROM proveedores WHERE id = $1`,
             params.id
           )
           if (resultado && resultado.length > 0) {
             proveedor.comentario = resultado[0].comentario
+            proveedor.numeroCuenta = resultado[0].numero_cuenta
+            proveedor.banco = resultado[0].banco
           } else {
             proveedor.comentario = null
+            proveedor.numeroCuenta = null
+            proveedor.banco = null
           }
-        } catch (comentarioError: any) {
-          // Si el campo comentario no existe, simplemente agregar null
-          console.log('[API PROVEEDOR] Campo comentario no existe aún, usando null')
+        } catch (camposError: any) {
+          // Si los campos no existen, simplemente agregar null
+          console.log('[API PROVEEDOR] Campos adicionales no existen aún, usando null')
           proveedor.comentario = null
+          proveedor.numeroCuenta = null
+          proveedor.banco = null
         }
       }
     } catch (error: any) {
@@ -79,7 +88,7 @@ export async function GET(
             )
           }
           
-          // Convertir a objeto plano y agregar comentario
+          // Convertir a objeto plano y agregar campos adicionales
           proveedor = {
             id: proveedorSinComentario.id,
             nombre: proveedorSinComentario.nombre,
@@ -95,6 +104,8 @@ export async function GET(
             minimoCompra: proveedorSinComentario.minimoCompra,
             metodoPago: proveedorSinComentario.metodoPago,
             comentario: null,
+            numeroCuenta: null,
+            banco: null,
             createdAt: proveedorSinComentario.createdAt,
             updatedAt: proveedorSinComentario.updatedAt,
           }
@@ -194,18 +205,18 @@ export async function PUT(
       return null
     }
 
-    // Verificar si el campo comentario existe en la BD antes de intentar actualizarlo
-    let campoComentarioExiste = false
+    // Verificar si los campos adicionales existen en la BD antes de intentar actualizarlos
+    let camposAdicionalesExisten = false
     try {
       await prisma.$queryRawUnsafe(
-        `SELECT comentario FROM proveedores WHERE id = $1 LIMIT 1`,
+        `SELECT comentario, numero_cuenta, banco FROM proveedores WHERE id = $1 LIMIT 1`,
         params.id
       )
-      campoComentarioExiste = true
-      console.log('[API PROVEEDOR PUT] Campo comentario existe en BD')
+      camposAdicionalesExisten = true
+      console.log('[API PROVEEDOR PUT] Campos adicionales existen en BD')
     } catch (error: any) {
-      console.log('[API PROVEEDOR PUT] Campo comentario NO existe en BD, actualizando sin ese campo')
-      campoComentarioExiste = false
+      console.log('[API PROVEEDOR PUT] Campos adicionales NO existen en BD, actualizando sin esos campos')
+      camposAdicionalesExisten = false
     }
     
     // Construir el objeto de datos
@@ -224,9 +235,11 @@ export async function PUT(
       activo: body.activo !== undefined ? Boolean(body.activo) : proveedorExistente.activo,
     }
     
-    // Solo incluir comentario si el campo existe en la BD
-    if (campoComentarioExiste) {
+    // Solo incluir campos adicionales si existen en la BD
+    if (camposAdicionalesExisten) {
       dataToUpdate.comentario = toStringOrNull(body.comentario)
+      dataToUpdate.numeroCuenta = toStringOrNull(body.numeroCuenta)
+      dataToUpdate.banco = toStringOrNull(body.banco)
     }
     
     // Actualizar el proveedor
@@ -235,22 +248,30 @@ export async function PUT(
       data: dataToUpdate,
     })
     
-    // Si el comentario tiene valor pero el campo no existe, intentar actualizarlo con SQL directo
+    // Si los campos adicionales tienen valor pero no existen, intentar actualizarlos con SQL directo
     // (esto no debería pasar, pero por si acaso)
-    if (!campoComentarioExiste && body.comentario && toStringOrNull(body.comentario)) {
+    if (!camposAdicionalesExisten && (body.comentario || body.numeroCuenta || body.banco)) {
       try {
         await prisma.$executeRawUnsafe(
           `ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS comentario TEXT`
         )
         await prisma.$executeRawUnsafe(
-          `UPDATE proveedores SET comentario = $1 WHERE id = $2`,
+          `ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS numero_cuenta TEXT`
+        )
+        await prisma.$executeRawUnsafe(
+          `ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS banco TEXT`
+        )
+        await prisma.$executeRawUnsafe(
+          `UPDATE proveedores SET comentario = $1, numero_cuenta = $2, banco = $3 WHERE id = $4`,
           toStringOrNull(body.comentario),
+          toStringOrNull(body.numeroCuenta),
+          toStringOrNull(body.banco),
           params.id
         )
-        console.log('[API PROVEEDOR PUT] Campo comentario agregado y actualizado con SQL')
+        console.log('[API PROVEEDOR PUT] Campos adicionales agregados y actualizados con SQL')
       } catch (sqlError: any) {
-        console.log('[API PROVEEDOR PUT] No se pudo agregar/actualizar comentario con SQL:', sqlError?.message)
-        // Continuar sin el campo
+        console.log('[API PROVEEDOR PUT] No se pudo agregar/actualizar campos adicionales con SQL:', sqlError?.message)
+        // Continuar sin los campos
       }
     }
 

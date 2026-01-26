@@ -47,6 +47,8 @@ export default function NuevoProveedorPage() {
     minimoCompra: 0,
     metodoPago: '',
     comentario: '',
+    numeroCuenta: '',
+    banco: '',
     diasPedido: [] as string[],
     horarioPedido: '',
     diasEntrega: [] as string[],
@@ -234,6 +236,45 @@ export default function NuevoProveedorPage() {
                 <p className="text-xs text-neutral-500 mt-1">
                   Información adicional como número para pedidos, horarios especiales, etc.
                 </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Datos de Pago */}
+          <div>
+            <h2 className="text-lg font-semibold text-neutral-900 mb-4">
+              Datos de Pago
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Número de Cuenta</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={formData.numeroCuenta}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      numeroCuenta: e.target.value,
+                    })
+                  }
+                  placeholder="Ej: 001234567890"
+                />
+              </div>
+              <div>
+                <label className="label">Banco</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={formData.banco}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      banco: e.target.value,
+                    })
+                  }
+                  placeholder="Ej: BROU, Santander, Itaú, etc."
+                />
               </div>
             </div>
           </div>

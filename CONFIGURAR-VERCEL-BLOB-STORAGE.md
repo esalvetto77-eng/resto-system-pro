@@ -55,7 +55,7 @@ Vercel debería configurar automáticamente la variable `BLOB_READ_WRITE_TOKEN`,
 
 El sistema de subida de documentos incluye **múltiples capas de seguridad**:
 
-### 1. **Autenticación y Autorización**
+## 1. **Autenticación y Autorización**
 - ✅ Solo usuarios autenticados pueden subir documentos
 - ✅ Solo usuarios autenticados pueden ver documentos
 - ✅ Validación de sesión en cada request

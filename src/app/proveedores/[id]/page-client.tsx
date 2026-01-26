@@ -22,6 +22,8 @@ interface ProveedorDetailClientProps {
     minimoCompra: number | null
     metodoPago: string | null
     comentario: string | null
+    numeroCuenta: string | null
+    banco: string | null
     productos: Array<{
       id: string
       precioCompra: number | null
@@ -155,6 +157,38 @@ export function ProveedorDetailPageClient({ proveedor }: ProveedorDetailClientPr
               )}
             </div>
           </div>
+
+          {(proveedor.numeroCuenta || proveedor.banco) && (
+            <div className="card">
+              <div className="card-header">
+                <h2 className="text-lg font-semibold text-neutral-900">
+                  Datos de Pago
+                </h2>
+              </div>
+              <div className="card-body space-y-4">
+                {proveedor.numeroCuenta && (
+                  <div>
+                    <div className="text-sm font-medium text-neutral-500">
+                      Número de Cuenta
+                    </div>
+                    <div className="text-base text-neutral-900">
+                      {proveedor.numeroCuenta}
+                    </div>
+                  </div>
+                )}
+                {proveedor.banco && (
+                  <div>
+                    <div className="text-sm font-medium text-neutral-500">
+                      Banco
+                    </div>
+                    <div className="text-base text-neutral-900">
+                      {proveedor.banco}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="card">
             <div className="card-header">

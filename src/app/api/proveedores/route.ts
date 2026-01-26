@@ -35,24 +35,53 @@ export async function GET() {
         },
       })
       
-      // Si el campo comentario existe, intentar leerlo con una consulta raw
+      // Si los campos adicionales existen, intentar leerlos con una consulta raw
       try {
-        const proveedoresConComentario = await prisma.$queryRawUnsafe<Array<{id: string, comentario: string | null}>>(
-          `SELECT id, comentario FROM proveedores WHERE activo = true ORDER BY nombre ASC`
+        const proveedoresConCamposAdicionales = await prisma.$queryRawUnsafe<Array<{
+          id: string, 
+          comentario: string | null,
+          numero_cuenta: string | null,
+          banco: string | null
+        }>>(
+          `SELECT id, comentario, numero_cuenta, banco FROM proveedores WHERE activo = true ORDER BY nombre ASC`
         )
         
-        // Mapear comentarios a los proveedores
-        const comentariosMap = new Map(proveedoresConComentario.map(p => [p.id, p.comentario]))
-        proveedores = proveedores.map(p => ({
-          ...p,
-          comentario: comentariosMap.get(p.id) || null,
-        }))
-      } catch (comentarioError: any) {
-        // Si el campo comentario no existe, simplemente agregar null
-        console.log('[API PROVEEDORES] Campo comentario no existe aún, usando null')
+        // Mapear campos adicionales a los proveedores (convertir snake_case a camelCase)
+        const camposMap = new Map(proveedoresConCamposAdicionales.map(p => [
+          p.id, 
+          {
+            comentario: p.comentario,
+            numeroCuenta: p.numero_cuenta,
+            banco: p.banco
+          }
+        ]))
+        
+        // Mapear campos adicionales a los proveedores
+        const camposMap = new Map(proveedoresConCamposAdicionales.map(p => [
+          p.id, 
+          {
+            comentario: p.comentario,
+            numeroCuenta: p.numeroCuenta,
+            banco: p.banco
+          }
+        ]))
+        proveedores = proveedores.map(p => {
+          const campos = camposMap.get(p.id) || { comentario: null, numeroCuenta: null, banco: null }
+          return {
+            ...p,
+            comentario: campos.comentario,
+            numeroCuenta: campos.numeroCuenta,
+            banco: campos.banco,
+          }
+        })
+      } catch (camposError: any) {
+        // Si los campos no existen, simplemente agregar null
+        console.log('[API PROVEEDORES] Campos adicionales no existen aún, usando null')
         proveedores = proveedores.map(p => ({
           ...p,
           comentario: null,
+          numeroCuenta: null,
+          banco: null,
         }))
       }
     } catch (selectError: any) {
@@ -135,22 +164,41 @@ export async function POST(request: NextRequest) {
       return null
     }
 
+    // Verificar si los campos adicionales existen antes de intentar guardarlos
+    let camposAdicionalesExisten = false
+    try {
+      await prisma.$queryRawUnsafe(
+        `SELECT numero_cuenta, banco FROM proveedores LIMIT 1`
+      )
+      camposAdicionalesExisten = true
+    } catch (error: any) {
+      camposAdicionalesExisten = false
+    }
+
+    const dataToCreate: any = {
+      nombre: body.nombre.trim(),
+      contacto: toStringOrNull(body.contacto),
+      telefono: toStringOrNull(body.telefono),
+      email: toStringOrNull(body.email),
+      direccion: toStringOrNull(body.direccion),
+      rubro: toStringOrNull(body.rubro),
+      minimoCompra: toNumberOrNull(body.minimoCompra),
+      metodoPago: toStringOrNull(body.metodoPago),
+      diasPedido: handleDiasField(body.diasPedido),
+      horarioPedido: toStringOrNull(body.horarioPedido),
+      diasEntrega: handleDiasField(body.diasEntrega),
+      activo: body.activo !== undefined ? Boolean(body.activo) : true,
+    }
+
+    // Solo incluir campos adicionales si existen en la BD
+    if (camposAdicionalesExisten) {
+      dataToCreate.comentario = toStringOrNull(body.comentario)
+      dataToCreate.numeroCuenta = toStringOrNull(body.numeroCuenta)
+      dataToCreate.banco = toStringOrNull(body.banco)
+    }
+
     const proveedor = await prisma.proveedor.create({
-      data: {
-        nombre: body.nombre.trim(),
-        contacto: toStringOrNull(body.contacto),
-        telefono: toStringOrNull(body.telefono),
-        email: toStringOrNull(body.email),
-        direccion: toStringOrNull(body.direccion),
-        rubro: toStringOrNull(body.rubro),
-        minimoCompra: toNumberOrNull(body.minimoCompra),
-        metodoPago: toStringOrNull(body.metodoPago),
-        comentario: toStringOrNull(body.comentario),
-        diasPedido: handleDiasField(body.diasPedido),
-        horarioPedido: toStringOrNull(body.horarioPedido),
-        diasEntrega: handleDiasField(body.diasEntrega),
-        activo: body.activo !== undefined ? Boolean(body.activo) : true,
-      },
+      data: dataToCreate,
     })
 
     return NextResponse.json(proveedor, { status: 201 })

@@ -24,6 +24,8 @@ model Proveedor {
   rubro         String?
   metodoPago    String?
   comentario    String?
+  numeroCuenta  String?
+  banco         String?
   pedidos       Pedido[]
   productos     ProductoProveedor[]
   pagosPendientes PagoPendiente[]
