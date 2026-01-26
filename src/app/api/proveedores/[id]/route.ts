@@ -243,47 +243,90 @@ export async function PUT(
       activo: body.activo !== undefined ? Boolean(body.activo) : proveedorExistente.activo,
     }
     
-    // NO incluir campos adicionales en Prisma - se actualizarán con SQL directo
-    // Esto evita problemas de mapeo camelCase/snake_case
+    // Si hay campos adicionales, usar SQL directo para TODO para evitar problemas de mapeo Prisma
+    // Si no hay campos adicionales, usar Prisma normalmente
+    let proveedor: any
     
-    // Actualizar el proveedor con Prisma (solo campos básicos - siempre funciona)
-    const proveedor = await prisma.proveedor.update({
-      where: { id: params.id },
-      data: dataToUpdate,
-    })
-    
-    // Actualizar campos adicionales con SQL directo (usando nombres exactos de columnas)
-    // Esto evita problemas de mapeo Prisma cuando las columnas fueron agregadas manualmente
     if (tieneComentario || tieneNumeroCuenta || tieneBanco) {
-      const updatesAdicionales: string[] = []
+      // Usar SQL directo para TODO cuando hay campos adicionales
+      // Esto evita que Prisma intente validar campos que fueron agregados manualmente
+      const updates: string[] = []
       const valores: any[] = []
       
+      // Campos básicos (usando nombres que sabemos que Prisma mapea correctamente)
+      updates.push('nombre = $' + (valores.length + 1))
+      valores.push(dataToUpdate.nombre)
+      updates.push('contacto = $' + (valores.length + 1))
+      valores.push(dataToUpdate.contacto)
+      updates.push('telefono = $' + (valores.length + 1))
+      valores.push(dataToUpdate.telefono)
+      updates.push('email = $' + (valores.length + 1))
+      valores.push(dataToUpdate.email)
+      updates.push('direccion = $' + (valores.length + 1))
+      valores.push(dataToUpdate.direccion)
+      updates.push('rubro = $' + (valores.length + 1))
+      valores.push(dataToUpdate.rubro)
+      
+      // Campos que pueden tener nombres diferentes - usar los que existen
+      const columnasBasicas = await prisma.$queryRawUnsafe<Array<{column_name: string}>>(
+        `SELECT column_name FROM information_schema.columns 
+         WHERE table_name = 'proveedores' 
+         AND column_name IN ('minimo_compra', 'minimocompra', 'metodo_pago', 'metodopago', 'dias_pedido', 'diaspedido', 'horario_pedido', 'horariopedido', 'dias_entrega', 'diasentrega', 'updated_at', 'updatedat')`
+      )
+      const nombresBasicos = columnasBasicas.map(c => c.column_name)
+      
+      const minimoCompraCol = nombresBasicos.find(c => c.toLowerCase().includes('minimo') && c.toLowerCase().includes('compra')) || 'minimoCompra'
+      const metodoPagoCol = nombresBasicos.find(c => c.toLowerCase().includes('metodo') && c.toLowerCase().includes('pago')) || 'metodoPago'
+      const diasPedidoCol = nombresBasicos.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('pedido')) || 'diasPedido'
+      const horarioPedidoCol = nombresBasicos.find(c => c.toLowerCase().includes('horario') && c.toLowerCase().includes('pedido')) || 'horarioPedido'
+      const diasEntregaCol = nombresBasicos.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega')) || 'diasEntrega'
+      const updatedAtCol = nombresBasicos.find(c => c.toLowerCase().includes('updated')) || 'updatedAt'
+      
+      updates.push(`${minimoCompraCol} = $${valores.length + 1}`)
+      valores.push(dataToUpdate.minimoCompra)
+      updates.push(`${metodoPagoCol} = $${valores.length + 1}`)
+      valores.push(dataToUpdate.metodoPago)
+      updates.push(`${diasPedidoCol} = $${valores.length + 1}`)
+      valores.push(dataToUpdate.diasPedido)
+      updates.push(`${horarioPedidoCol} = $${valores.length + 1}`)
+      valores.push(dataToUpdate.horarioPedido)
+      updates.push(`${diasEntregaCol} = $${valores.length + 1}`)
+      valores.push(dataToUpdate.diasEntrega)
+      updates.push(`activo = $${valores.length + 1}`)
+      valores.push(dataToUpdate.activo)
+      updates.push(`${updatedAtCol} = NOW()`)
+      
+      // Campos adicionales
       if (tieneComentario) {
-        updatesAdicionales.push('comentario = $' + (valores.length + 1))
+        updates.push('comentario = $' + (valores.length + 1))
         valores.push(toStringOrNull(body.comentario))
       }
       if (tieneNumeroCuenta) {
-        updatesAdicionales.push('numero_cuenta = $' + (valores.length + 1))
+        updates.push('numero_cuenta = $' + (valores.length + 1))
         valores.push(toStringOrNull(body.numeroCuenta))
       }
       if (tieneBanco) {
-        updatesAdicionales.push('banco = $' + (valores.length + 1))
+        updates.push('banco = $' + (valores.length + 1))
         valores.push(toStringOrNull(body.banco))
       }
       
-      if (updatesAdicionales.length > 0) {
-        valores.push(params.id)
-        try {
-          await prisma.$executeRawUnsafe(
-            `UPDATE proveedores SET ${updatesAdicionales.join(', ')} WHERE id = $${valores.length}`,
-            ...valores
-          )
-          console.log('[API PROVEEDOR PUT] Campos adicionales actualizados con SQL directo')
-        } catch (sqlError: any) {
-          // Si falla, loguear pero no fallar toda la operación
-          console.log('[API PROVEEDOR PUT] Error al actualizar campos adicionales (continuando):', sqlError?.message)
-        }
-      }
+      valores.push(params.id)
+      await prisma.$executeRawUnsafe(
+        `UPDATE proveedores SET ${updates.join(', ')} WHERE id = $${valores.length}`,
+        ...valores
+      )
+      console.log('[API PROVEEDOR PUT] Actualizado con SQL directo (incluyendo campos adicionales)')
+      
+      // Obtener el proveedor actualizado
+      proveedor = await prisma.proveedor.findUnique({
+        where: { id: params.id },
+      })
+    } else {
+      // Si no hay campos adicionales, usar Prisma normalmente
+      proveedor = await prisma.proveedor.update({
+        where: { id: params.id },
+        data: dataToUpdate,
+      })
     }
 
     return NextResponse.json(proveedor)
