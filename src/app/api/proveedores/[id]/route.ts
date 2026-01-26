@@ -282,10 +282,27 @@ export async function PUT(
         }
       }
     } catch (prismaError: any) {
-      // Si Prisma falla por cualquier razón, usar SQL directo para todo
-      console.log('[API PROVEEDOR PUT] Prisma falló, usando SQL directo:', prismaError?.message)
+      // Si Prisma falla, obtener los nombres reales de las columnas y usar SQL directo
+      console.log('[API PROVEEDOR PUT] Prisma falló, obteniendo nombres de columnas y usando SQL directo:', prismaError?.message)
       
-      // Actualizar todos los campos con SQL directo
+      // Obtener los nombres reales de las columnas de la base de datos
+      const columnas = await prisma.$queryRawUnsafe<Array<{column_name: string}>>(
+        `SELECT column_name 
+         FROM information_schema.columns 
+         WHERE table_name = 'proveedores' 
+         AND column_name IN ('nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'minimo_compra', 'minimocompra', 'metodo_pago', 'metodopago', 'dias_pedido', 'diaspedido', 'horario_pedido', 'horariopedido', 'dias_entrega', 'diasentrega', 'activo', 'updated_at', 'updatedat')
+         ORDER BY column_name`
+      )
+      
+      const nombresColumnas = columnas.map(c => c.column_name)
+      const minimoCompraCol = nombresColumnas.find(c => c.toLowerCase().includes('minimo') && c.toLowerCase().includes('compra')) || 'minimoCompra'
+      const metodoPagoCol = nombresColumnas.find(c => c.toLowerCase().includes('metodo') && c.toLowerCase().includes('pago')) || 'metodoPago'
+      const diasPedidoCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('pedido')) || 'diasPedido'
+      const horarioPedidoCol = nombresColumnas.find(c => c.toLowerCase().includes('horario') && c.toLowerCase().includes('pedido')) || 'horarioPedido'
+      const diasEntregaCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega')) || 'diasEntrega'
+      const updatedAtCol = nombresColumnas.find(c => c.toLowerCase().includes('updated')) || 'updatedAt'
+      
+      // Construir el UPDATE con los nombres reales de las columnas
       await prisma.$executeRawUnsafe(
         `UPDATE proveedores SET 
           nombre = $1, 
@@ -294,13 +311,13 @@ export async function PUT(
           email = $4, 
           direccion = $5, 
           rubro = $6, 
-          minimo_compra = $7, 
-          metodo_pago = $8, 
-          dias_pedido = $9, 
-          horario_pedido = $10, 
-          dias_entrega = $11, 
+          ${minimoCompraCol} = $7, 
+          ${metodoPagoCol} = $8, 
+          ${diasPedidoCol} = $9, 
+          ${horarioPedidoCol} = $10, 
+          ${diasEntregaCol} = $11, 
           activo = $12,
-          updated_at = NOW()
+          ${updatedAtCol} = NOW()
          WHERE id = $13`,
         dataToUpdate.nombre,
         dataToUpdate.contacto,
