@@ -189,152 +189,64 @@ export async function POST(request: NextRequest) {
       activo: body.activo !== undefined ? Boolean(body.activo) : true,
     }
 
-    // Si hay campos adicionales, usar SQL directo para evitar validación de Prisma
-    let proveedor: any
+    // SOLUCIÓN SIMPLE: Usar Prisma para crear (siempre funciona), luego actualizar campos adicionales con SQL
+    const proveedor = await prisma.proveedor.create({
+      data: dataToCreate,
+    })
     
+    // Si hay campos adicionales, actualizarlos con SQL directo después de crear
     if (tieneComentario || tieneNumeroCuenta || tieneBanco) {
-      // Usar SQL directo para crear cuando hay campos adicionales
-      const columnasBasicas = await prisma.$queryRawUnsafe<Array<{column_name: string}>>(
-        `SELECT column_name FROM information_schema.columns 
-         WHERE table_name = 'proveedores' 
-         AND column_name IN ('minimo_compra', 'minimocompra', 'metodo_pago', 'metodopago', 'dias_pedido', 'diaspedido', 'horario_pedido', 'horariopedido', 'dias_entrega', 'diasentrega')`
-      )
-      const nombresBasicos = columnasBasicas.map(c => c.column_name)
-      
-      const minimoCompraCol = nombresBasicos.find(c => c.toLowerCase().includes('minimo') && c.toLowerCase().includes('compra'))
-      const metodoPagoCol = nombresBasicos.find(c => c.toLowerCase().includes('metodo') && c.toLowerCase().includes('pago'))
-      const diasPedidoCol = nombresBasicos.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('pedido'))
-      const horarioPedidoCol = nombresBasicos.find(c => c.toLowerCase().includes('horario') && c.toLowerCase().includes('pedido'))
-      const diasEntregaCol = nombresBasicos.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega'))
-      
-      // Obtener nombres reales de columnas de fecha
-      const columnasFecha = await prisma.$queryRawUnsafe<Array<{column_name: string}>>(
-        `SELECT column_name FROM information_schema.columns 
-         WHERE table_name = 'proveedores' 
-         AND column_name IN ('created_at', 'createdat', 'updated_at', 'updatedat')`
-      )
-      const nombresFecha = columnasFecha.map(c => c.column_name)
-      const createdAtCol = nombresFecha.find(c => c.toLowerCase().includes('created'))
-      const updatedAtCol = nombresFecha.find(c => c.toLowerCase().includes('updated'))
-      
-      const campos: string[] = ['id', 'nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'activo']
+      const updatesAdicionales: string[] = []
       const valores: any[] = []
       
-      // Generar ID (Prisma usa cuid, pero para SQL directo usamos un formato compatible)
-      // Usar timestamp + random para generar un ID único
-      const nuevoId = `clx${Date.now()}${Math.random().toString(36).substring(2, 11)}`
-      valores.push(nuevoId)
-      valores.push(dataToCreate.nombre)
-      valores.push(dataToCreate.contacto)
-      valores.push(dataToCreate.telefono)
-      valores.push(dataToCreate.email)
-      valores.push(dataToCreate.direccion)
-      valores.push(dataToCreate.rubro)
-      valores.push(dataToCreate.activo)
-      
-      if (minimoCompraCol) {
-        campos.push(minimoCompraCol)
-        valores.push(dataToCreate.minimoCompra)
-      }
-      if (metodoPagoCol) {
-        campos.push(metodoPagoCol)
-        valores.push(dataToCreate.metodoPago)
-      }
-      if (diasPedidoCol) {
-        campos.push(diasPedidoCol)
-        valores.push(dataToCreate.diasPedido)
-      }
-      if (horarioPedidoCol) {
-        campos.push(horarioPedidoCol)
-        valores.push(dataToCreate.horarioPedido)
-      }
-      if (diasEntregaCol) {
-        campos.push(diasEntregaCol)
-        valores.push(dataToCreate.diasEntrega)
-      }
-      
       if (tieneComentario) {
-        campos.push('comentario')
+        updatesAdicionales.push('comentario = $' + (valores.length + 1))
         valores.push(toStringOrNull(body.comentario))
       }
       if (tieneNumeroCuenta) {
-        campos.push('numero_cuenta')
+        updatesAdicionales.push('numero_cuenta = $' + (valores.length + 1))
         valores.push(toStringOrNull(body.numeroCuenta))
       }
       if (tieneBanco) {
-        campos.push('banco')
+        updatesAdicionales.push('banco = $' + (valores.length + 1))
         valores.push(toStringOrNull(body.banco))
       }
       
-      // Agregar columnas de fecha si existen (sin fallbacks - solo si realmente existen)
-      if (createdAtCol) {
-        campos.push(createdAtCol)
-        valores.push(new Date())
-      }
-      if (updatedAtCol) {
-        campos.push(updatedAtCol)
-        valores.push(new Date())
-      }
-      
-      const placeholders = campos.map((_, i) => `$${i + 1}`).join(', ')
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO proveedores (${campos.join(', ')}) 
-         VALUES (${placeholders})`,
-        ...valores
-      )
-      
-      console.log('[API PROVEEDORES POST] Proveedor creado con SQL directo')
-      
-      // Obtener el proveedor creado con select explícito
-      proveedor = await prisma.proveedor.findUnique({
-        where: { id: nuevoId },
-        select: {
-          id: true,
-          nombre: true,
-          contacto: true,
-          telefono: true,
-          email: true,
-          direccion: true,
-          rubro: true,
-          minimoCompra: true,
-          metodoPago: true,
-          diasPedido: true,
-          horarioPedido: true,
-          diasEntrega: true,
-          activo: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      })
-      
-      // Agregar campos adicionales si existen
-      if (tieneComentario || tieneNumeroCuenta || tieneBanco) {
+      if (updatesAdicionales.length > 0) {
+        valores.push(proveedor.id)
         try {
-          const camposAdicionales = await prisma.$queryRawUnsafe<Array<{
-            comentario: string | null,
-            numero_cuenta: string | null,
-            banco: string | null
-          }>>(
-            `SELECT comentario, numero_cuenta, banco FROM proveedores WHERE id = $1`,
-            nuevoId
+          await prisma.$executeRawUnsafe(
+            `UPDATE proveedores SET ${updatesAdicionales.join(', ')} WHERE id = $${valores.length}`,
+            ...valores
           )
-          if (camposAdicionales && camposAdicionales.length > 0) {
-            proveedor = {
-              ...proveedor,
-              comentario: camposAdicionales[0].comentario,
-              numeroCuenta: camposAdicionales[0].numero_cuenta,
-              banco: camposAdicionales[0].banco,
-            }
-          }
-        } catch (error: any) {
-          console.log('[API PROVEEDORES POST] Error al obtener campos adicionales (continuando):', error?.message)
+          console.log('[API PROVEEDORES POST] Campos adicionales actualizados con SQL directo')
+        } catch (sqlError: any) {
+          // Si falla, loguear pero no fallar toda la operación
+          console.log('[API PROVEEDORES POST] Error al actualizar campos adicionales (continuando):', sqlError?.message)
         }
       }
-    } else {
-      // Si no hay campos adicionales, usar Prisma normalmente
-      proveedor = await prisma.proveedor.create({
-        data: dataToCreate,
-      })
+      
+      // Obtener campos adicionales para incluirlos en la respuesta
+      try {
+        const camposAdicionales = await prisma.$queryRawUnsafe<Array<{
+          comentario: string | null,
+          numero_cuenta: string | null,
+          banco: string | null
+        }>>(
+          `SELECT comentario, numero_cuenta, banco FROM proveedores WHERE id = $1`,
+          proveedor.id
+        )
+        if (camposAdicionales && camposAdicionales.length > 0) {
+          return NextResponse.json({
+            ...proveedor,
+            comentario: camposAdicionales[0].comentario,
+            numeroCuenta: camposAdicionales[0].numero_cuenta,
+            banco: camposAdicionales[0].banco,
+          }, { status: 201 })
+        }
+      } catch (error: any) {
+        console.log('[API PROVEEDORES POST] Error al obtener campos adicionales (continuando):', error?.message)
+      }
     }
 
     return NextResponse.json(proveedor, { status: 201 })
