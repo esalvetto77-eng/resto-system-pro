@@ -265,67 +265,74 @@ export async function POST(request: NextRequest) {
         // Generar ID
         const nuevoId = `clx${Date.now()}${Math.random().toString(36).substring(2, 11)}`
         
-        // Campos REQUERIDOS (NOT NULL) - usar nombres encontrados o los que Prisma espera
-        const campos: string[] = ['id', 'nombre', diasPedidoFinal, diasEntregaFinal, 'activo']
-        const valores: any[] = [
-          nuevoId, 
-          dataToCreate.nombre, 
-          dataToCreate.diasPedido || '[]', // Asegurar que nunca sea NULL
-          dataToCreate.diasEntrega || '[]', // Asegurar que nunca sea NULL
-          dataToCreate.activo
-        ]
+        // Usar los nombres EXACTOS encontrados en la BD y ponerlos entre comillas dobles para preservar el case
+        // PostgreSQL convierte a minúsculas si no usamos comillas
+        const campos: string[] = []
+        const valores: any[] = []
         
-        // Campos opcionales
+        // Campos REQUERIDOS (NOT NULL) - usar nombres exactos con comillas
+        campos.push('"id"')
+        valores.push(nuevoId)
+        campos.push('"nombre"')
+        valores.push(dataToCreate.nombre)
+        campos.push(`"${diasPedidoFinal}"`)
+        valores.push(dataToCreate.diasPedido || '[]')
+        campos.push(`"${diasEntregaFinal}"`)
+        valores.push(dataToCreate.diasEntrega || '[]')
+        campos.push('"activo"')
+        valores.push(dataToCreate.activo)
+        
+        // Campos opcionales - usar nombres exactos encontrados
         if (nombresColumnas.includes('contacto')) {
-          campos.push('contacto')
+          campos.push('"contacto"')
           valores.push(dataToCreate.contacto)
         }
         if (nombresColumnas.includes('telefono')) {
-          campos.push('telefono')
+          campos.push('"telefono"')
           valores.push(dataToCreate.telefono)
         }
         if (nombresColumnas.includes('email')) {
-          campos.push('email')
+          campos.push('"email"')
           valores.push(dataToCreate.email)
         }
         if (nombresColumnas.includes('direccion')) {
-          campos.push('direccion')
+          campos.push('"direccion"')
           valores.push(dataToCreate.direccion)
         }
         if (nombresColumnas.includes('rubro')) {
-          campos.push('rubro')
+          campos.push('"rubro"')
           valores.push(dataToCreate.rubro)
         }
         if (minimoCompraCol) {
-          campos.push(minimoCompraCol)
+          campos.push(`"${minimoCompraCol}"`)
           valores.push(dataToCreate.minimoCompra)
         }
         if (metodoPagoCol) {
-          campos.push(metodoPagoCol)
+          campos.push(`"${metodoPagoCol}"`)
           valores.push(dataToCreate.metodoPago)
         }
         if (horarioPedidoCol) {
-          campos.push(horarioPedidoCol)
+          campos.push(`"${horarioPedidoCol}"`)
           valores.push(dataToCreate.horarioPedido)
         }
         if (createdAtCol) {
-          campos.push(createdAtCol)
+          campos.push(`"${createdAtCol}"`)
           valores.push(new Date())
         }
         if (updatedAtCol) {
-          campos.push(updatedAtCol)
+          campos.push(`"${updatedAtCol}"`)
           valores.push(new Date())
         }
         if (tieneComentario) {
-          campos.push('comentario')
+          campos.push('"comentario"')
           valores.push(toStringOrNull(body.comentario))
         }
         if (tieneNumeroCuenta) {
-          campos.push('numero_cuenta')
+          campos.push('"numero_cuenta"')
           valores.push(toStringOrNull(body.numeroCuenta))
         }
         if (tieneBanco) {
-          campos.push('banco')
+          campos.push('"banco"')
           valores.push(toStringOrNull(body.banco))
         }
         
