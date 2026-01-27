@@ -211,17 +211,22 @@ export async function POST(request: NextRequest) {
         
         const minimoCompraCol = nombresColumnas.find(c => c.toLowerCase().includes('minimo') && c.toLowerCase().includes('compra'))
         const metodoPagoCol = nombresColumnas.find(c => c.toLowerCase().includes('metodo') && c.toLowerCase().includes('pago'))
-        const diasPedidoCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('pedido')) || 'diasPedido'
+        const diasPedidoCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('pedido'))
         const horarioPedidoCol = nombresColumnas.find(c => c.toLowerCase().includes('horario') && c.toLowerCase().includes('pedido'))
-        const diasEntregaCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega')) || 'diasEntrega'
+        const diasEntregaCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega'))
         const createdAtCol = nombresColumnas.find(c => c.toLowerCase().includes('created'))
         const updatedAtCol = nombresColumnas.find(c => c.toLowerCase().includes('updated'))
+        
+        // Verificar que los campos REQUERIDOS existan
+        if (!diasPedidoCol || !diasEntregaCol) {
+          throw new Error('No se encontraron las columnas requeridas diasPedido o diasEntrega en la base de datos')
+        }
         
         // Generar ID
         const nuevoId = `clx${Date.now()}${Math.random().toString(36).substring(2, 11)}`
         
-        // Campos REQUERIDOS (NOT NULL) - siempre deben estar
-        const campos: string[] = ['id', 'nombre', 'diasPedido', 'diasEntrega', 'activo']
+        // Campos REQUERIDOS (NOT NULL) - siempre deben estar con sus nombres reales
+        const campos: string[] = ['id', 'nombre', diasPedidoCol, diasEntregaCol, 'activo']
         const valores: any[] = [
           nuevoId, 
           dataToCreate.nombre, 
