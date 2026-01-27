@@ -189,13 +189,139 @@ export async function POST(request: NextRequest) {
       activo: body.activo !== undefined ? Boolean(body.activo) : true,
     }
 
-    // SOLUCIÓN SIMPLE: Usar Prisma para crear (siempre funciona), luego actualizar campos adicionales con SQL
-    const proveedor = await prisma.proveedor.create({
-      data: dataToCreate,
-    })
+    // Intentar crear con Prisma primero
+    let proveedor: any
+    try {
+      proveedor = await prisma.proveedor.create({
+        data: dataToCreate,
+      })
+      console.log('[API PROVEEDORES POST] Proveedor creado con Prisma')
+    } catch (prismaError: any) {
+      // Si Prisma falla (porque valida el schema completo), usar SQL directo
+      if (prismaError?.message?.includes('numeroCuenta') || prismaError?.message?.includes('banco') || prismaError?.message?.includes('comentario')) {
+        console.log('[API PROVEEDORES POST] Prisma falló por campos adicionales, usando SQL directo')
+        
+        // Obtener nombres reales de todas las columnas necesarias
+        const todasLasColumnas = await prisma.$queryRawUnsafe<Array<{column_name: string}>>(
+          `SELECT column_name FROM information_schema.columns 
+           WHERE table_name = 'proveedores' 
+           AND column_name IN ('id', 'nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'activo', 'minimo_compra', 'minimocompra', 'metodo_pago', 'metodopago', 'dias_pedido', 'diaspedido', 'horario_pedido', 'horariopedido', 'dias_entrega', 'diasentrega', 'created_at', 'createdat', 'updated_at', 'updatedat', 'comentario', 'numero_cuenta', 'banco')`
+        )
+        const nombresColumnas = todasLasColumnas.map(c => c.column_name)
+        
+        const minimoCompraCol = nombresColumnas.find(c => c.toLowerCase().includes('minimo') && c.toLowerCase().includes('compra'))
+        const metodoPagoCol = nombresColumnas.find(c => c.toLowerCase().includes('metodo') && c.toLowerCase().includes('pago'))
+        const diasPedidoCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('pedido'))
+        const horarioPedidoCol = nombresColumnas.find(c => c.toLowerCase().includes('horario') && c.toLowerCase().includes('pedido'))
+        const diasEntregaCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega'))
+        const createdAtCol = nombresColumnas.find(c => c.toLowerCase().includes('created'))
+        const updatedAtCol = nombresColumnas.find(c => c.toLowerCase().includes('updated'))
+        
+        // Generar ID
+        const nuevoId = `clx${Date.now()}${Math.random().toString(36).substring(2, 11)}`
+        
+        const campos: string[] = ['id', 'nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'activo']
+        const valores: any[] = [nuevoId, dataToCreate.nombre, dataToCreate.contacto, dataToCreate.telefono, dataToCreate.email, dataToCreate.direccion, dataToCreate.rubro, dataToCreate.activo]
+        
+        if (minimoCompraCol) {
+          campos.push(minimoCompraCol)
+          valores.push(dataToCreate.minimoCompra)
+        }
+        if (metodoPagoCol) {
+          campos.push(metodoPagoCol)
+          valores.push(dataToCreate.metodoPago)
+        }
+        if (diasPedidoCol) {
+          campos.push(diasPedidoCol)
+          valores.push(dataToCreate.diasPedido)
+        }
+        if (horarioPedidoCol) {
+          campos.push(horarioPedidoCol)
+          valores.push(dataToCreate.horarioPedido)
+        }
+        if (diasEntregaCol) {
+          campos.push(diasEntregaCol)
+          valores.push(dataToCreate.diasEntrega)
+        }
+        if (createdAtCol) {
+          campos.push(createdAtCol)
+          valores.push(new Date())
+        }
+        if (updatedAtCol) {
+          campos.push(updatedAtCol)
+          valores.push(new Date())
+        }
+        if (tieneComentario) {
+          campos.push('comentario')
+          valores.push(toStringOrNull(body.comentario))
+        }
+        if (tieneNumeroCuenta) {
+          campos.push('numero_cuenta')
+          valores.push(toStringOrNull(body.numeroCuenta))
+        }
+        if (tieneBanco) {
+          campos.push('banco')
+          valores.push(toStringOrNull(body.banco))
+        }
+        
+        const placeholders = campos.map((_, i) => `$${i + 1}`).join(', ')
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO proveedores (${campos.join(', ')}) VALUES (${placeholders})`,
+          ...valores
+        )
+        
+        // Obtener el proveedor creado
+        proveedor = await prisma.proveedor.findUnique({
+          where: { id: nuevoId },
+          select: {
+            id: true,
+            nombre: true,
+            contacto: true,
+            telefono: true,
+            email: true,
+            direccion: true,
+            rubro: true,
+            minimoCompra: true,
+            metodoPago: true,
+            diasPedido: true,
+            horarioPedido: true,
+            diasEntrega: true,
+            activo: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        })
+        
+        // Agregar campos adicionales
+        if (tieneComentario || tieneNumeroCuenta || tieneBanco) {
+          try {
+            const camposAdicionales = await prisma.$queryRawUnsafe<Array<{
+              comentario: string | null,
+              numero_cuenta: string | null,
+              banco: string | null
+            }>>(
+              `SELECT comentario, numero_cuenta, banco FROM proveedores WHERE id = $1`,
+              nuevoId
+            )
+            if (camposAdicionales && camposAdicionales.length > 0) {
+              proveedor = {
+                ...proveedor,
+                comentario: camposAdicionales[0].comentario,
+                numeroCuenta: camposAdicionales[0].numero_cuenta,
+                banco: camposAdicionales[0].banco,
+              }
+            }
+          } catch (error: any) {
+            console.log('[API PROVEEDORES POST] Error al obtener campos adicionales:', error?.message)
+          }
+        }
+      } else {
+        throw prismaError
+      }
+    }
     
-    // Si hay campos adicionales, actualizarlos con SQL directo después de crear
-    if (tieneComentario || tieneNumeroCuenta || tieneBanco) {
+    // Si se creó con Prisma y hay campos adicionales, actualizarlos
+    if (proveedor && (tieneComentario || tieneNumeroCuenta || tieneBanco)) {
       const updatesAdicionales: string[] = []
       const valores: any[] = []
       
@@ -219,33 +345,27 @@ export async function POST(request: NextRequest) {
             `UPDATE proveedores SET ${updatesAdicionales.join(', ')} WHERE id = $${valores.length}`,
             ...valores
           )
-          console.log('[API PROVEEDORES POST] Campos adicionales actualizados con SQL directo')
+          
+          // Obtener campos adicionales para la respuesta
+          const camposAdicionales = await prisma.$queryRawUnsafe<Array<{
+            comentario: string | null,
+            numero_cuenta: string | null,
+            banco: string | null
+          }>>(
+            `SELECT comentario, numero_cuenta, banco FROM proveedores WHERE id = $1`,
+            proveedor.id
+          )
+          if (camposAdicionales && camposAdicionales.length > 0) {
+            proveedor = {
+              ...proveedor,
+              comentario: camposAdicionales[0].comentario,
+              numeroCuenta: camposAdicionales[0].numero_cuenta,
+              banco: camposAdicionales[0].banco,
+            }
+          }
         } catch (sqlError: any) {
-          // Si falla, loguear pero no fallar toda la operación
           console.log('[API PROVEEDORES POST] Error al actualizar campos adicionales (continuando):', sqlError?.message)
         }
-      }
-      
-      // Obtener campos adicionales para incluirlos en la respuesta
-      try {
-        const camposAdicionales = await prisma.$queryRawUnsafe<Array<{
-          comentario: string | null,
-          numero_cuenta: string | null,
-          banco: string | null
-        }>>(
-          `SELECT comentario, numero_cuenta, banco FROM proveedores WHERE id = $1`,
-          proveedor.id
-        )
-        if (camposAdicionales && camposAdicionales.length > 0) {
-          return NextResponse.json({
-            ...proveedor,
-            comentario: camposAdicionales[0].comentario,
-            numeroCuenta: camposAdicionales[0].numero_cuenta,
-            banco: camposAdicionales[0].banco,
-          }, { status: 201 })
-        }
-      } catch (error: any) {
-        console.log('[API PROVEEDORES POST] Error al obtener campos adicionales (continuando):', error?.message)
       }
     }
 
