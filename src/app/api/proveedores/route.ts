@@ -201,32 +201,72 @@ export async function POST(request: NextRequest) {
       if (prismaError?.message?.includes('numeroCuenta') || prismaError?.message?.includes('banco') || prismaError?.message?.includes('comentario')) {
         console.log('[API PROVEEDORES POST] Prisma falló por campos adicionales, usando SQL directo')
         
-        // Obtener nombres reales de todas las columnas necesarias
+        // Obtener TODAS las columnas de la tabla para encontrar los nombres reales
         const todasLasColumnas = await prisma.$queryRawUnsafe<Array<{column_name: string}>>(
           `SELECT column_name FROM information_schema.columns 
            WHERE table_name = 'proveedores' 
-           AND column_name IN ('id', 'nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'activo', 'minimo_compra', 'minimocompra', 'metodo_pago', 'metodopago', 'dias_pedido', 'diaspedido', 'horario_pedido', 'horariopedido', 'dias_entrega', 'diasentrega', 'created_at', 'createdat', 'updated_at', 'updatedat', 'comentario', 'numero_cuenta', 'banco')`
+           ORDER BY column_name`
         )
         const nombresColumnas = todasLasColumnas.map(c => c.column_name)
         
-        const minimoCompraCol = nombresColumnas.find(c => c.toLowerCase().includes('minimo') && c.toLowerCase().includes('compra'))
-        const metodoPagoCol = nombresColumnas.find(c => c.toLowerCase().includes('metodo') && c.toLowerCase().includes('pago'))
-        const diasPedidoCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('pedido'))
-        const horarioPedidoCol = nombresColumnas.find(c => c.toLowerCase().includes('horario') && c.toLowerCase().includes('pedido'))
-        const diasEntregaCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega'))
-        const createdAtCol = nombresColumnas.find(c => c.toLowerCase().includes('created'))
-        const updatedAtCol = nombresColumnas.find(c => c.toLowerCase().includes('updated'))
+        console.log('[API PROVEEDORES POST] Columnas encontradas en BD:', nombresColumnas)
         
-        // Verificar que los campos REQUERIDOS existan
-        if (!diasPedidoCol || !diasEntregaCol) {
-          throw new Error('No se encontraron las columnas requeridas diasPedido o diasEntrega en la base de datos')
-        }
+        // Buscar columnas usando múltiples estrategias
+        const minimoCompraCol = nombresColumnas.find(c => 
+          c.toLowerCase() === 'minimo_compra' || 
+          c.toLowerCase() === 'minimocompra' ||
+          (c.toLowerCase().includes('minimo') && c.toLowerCase().includes('compra'))
+        )
+        const metodoPagoCol = nombresColumnas.find(c => 
+          c.toLowerCase() === 'metodo_pago' || 
+          c.toLowerCase() === 'metodopago' ||
+          (c.toLowerCase().includes('metodo') && c.toLowerCase().includes('pago'))
+        )
+        const diasPedidoCol = nombresColumnas.find(c => 
+          c.toLowerCase() === 'dias_pedido' || 
+          c.toLowerCase() === 'diaspedido' ||
+          c.toLowerCase() === 'dias_pedidos' ||
+          (c.toLowerCase().includes('dias') && c.toLowerCase().includes('pedido'))
+        )
+        const horarioPedidoCol = nombresColumnas.find(c => 
+          c.toLowerCase() === 'horario_pedido' || 
+          c.toLowerCase() === 'horariopedido' ||
+          (c.toLowerCase().includes('horario') && c.toLowerCase().includes('pedido'))
+        )
+        const diasEntregaCol = nombresColumnas.find(c => 
+          c.toLowerCase() === 'dias_entrega' || 
+          c.toLowerCase() === 'diasentrega' ||
+          c.toLowerCase() === 'dias_entregas' ||
+          (c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega'))
+        )
+        const createdAtCol = nombresColumnas.find(c => 
+          c.toLowerCase() === 'created_at' || 
+          c.toLowerCase() === 'createdat' ||
+          c.toLowerCase() === 'created'
+        )
+        const updatedAtCol = nombresColumnas.find(c => 
+          c.toLowerCase() === 'updated_at' || 
+          c.toLowerCase() === 'updatedat' ||
+          c.toLowerCase() === 'updated'
+        )
+        
+        // Si no encontramos las columnas requeridas, usar los nombres que Prisma espera (camelCase)
+        // Prisma mapea automáticamente camelCase a snake_case en PostgreSQL
+        const diasPedidoFinal = diasPedidoCol || 'diasPedido'
+        const diasEntregaFinal = diasEntregaCol || 'diasEntrega'
+        
+        console.log('[API PROVEEDORES POST] Columnas encontradas:', {
+          diasPedido: diasPedidoFinal,
+          diasEntrega: diasEntregaFinal,
+          minimoCompra: minimoCompraCol,
+          metodoPago: metodoPagoCol
+        })
         
         // Generar ID
         const nuevoId = `clx${Date.now()}${Math.random().toString(36).substring(2, 11)}`
         
-        // Campos REQUERIDOS (NOT NULL) - siempre deben estar con sus nombres reales
-        const campos: string[] = ['id', 'nombre', diasPedidoCol, diasEntregaCol, 'activo']
+        // Campos REQUERIDOS (NOT NULL) - usar nombres encontrados o los que Prisma espera
+        const campos: string[] = ['id', 'nombre', diasPedidoFinal, diasEntregaFinal, 'activo']
         const valores: any[] = [
           nuevoId, 
           dataToCreate.nombre, 
