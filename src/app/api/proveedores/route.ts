@@ -207,7 +207,17 @@ export async function POST(request: NextRequest) {
       const horarioPedidoCol = nombresBasicos.find(c => c.toLowerCase().includes('horario') && c.toLowerCase().includes('pedido'))
       const diasEntregaCol = nombresBasicos.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega'))
       
-      const campos: string[] = ['id', 'nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'activo', 'created_at', 'updated_at']
+      // Obtener nombres reales de columnas de fecha
+      const columnasFecha = await prisma.$queryRawUnsafe<Array<{column_name: string}>>(
+        `SELECT column_name FROM information_schema.columns 
+         WHERE table_name = 'proveedores' 
+         AND column_name IN ('created_at', 'createdat', 'updated_at', 'updatedat')`
+      )
+      const nombresFecha = columnasFecha.map(c => c.column_name)
+      const createdAtCol = nombresFecha.find(c => c.toLowerCase().includes('created')) || 'createdAt'
+      const updatedAtCol = nombresFecha.find(c => c.toLowerCase().includes('updated')) || 'updatedAt'
+      
+      const campos: string[] = ['id', 'nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'activo']
       const valores: any[] = []
       
       // Generar ID (Prisma usa cuid, pero para SQL directo usamos un formato compatible)
@@ -256,10 +266,20 @@ export async function POST(request: NextRequest) {
         valores.push(toStringOrNull(body.banco))
       }
       
+      // Agregar columnas de fecha si existen
+      if (createdAtCol && nombresFecha.includes(createdAtCol)) {
+        campos.push(createdAtCol)
+        valores.push(new Date())
+      }
+      if (updatedAtCol && nombresFecha.includes(updatedAtCol)) {
+        campos.push(updatedAtCol)
+        valores.push(new Date())
+      }
+      
       const placeholders = campos.map((_, i) => `$${i + 1}`).join(', ')
       await prisma.$executeRawUnsafe(
-        `INSERT INTO proveedores (${campos.join(', ')}, created_at, updated_at) 
-         VALUES (${placeholders}, NOW(), NOW())`,
+        `INSERT INTO proveedores (${campos.join(', ')}) 
+         VALUES (${placeholders})`,
         ...valores
       )
       
