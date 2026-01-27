@@ -211,18 +211,46 @@ export async function POST(request: NextRequest) {
         
         const minimoCompraCol = nombresColumnas.find(c => c.toLowerCase().includes('minimo') && c.toLowerCase().includes('compra'))
         const metodoPagoCol = nombresColumnas.find(c => c.toLowerCase().includes('metodo') && c.toLowerCase().includes('pago'))
-        const diasPedidoCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('pedido'))
+        const diasPedidoCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('pedido')) || 'diasPedido'
         const horarioPedidoCol = nombresColumnas.find(c => c.toLowerCase().includes('horario') && c.toLowerCase().includes('pedido'))
-        const diasEntregaCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega'))
+        const diasEntregaCol = nombresColumnas.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega')) || 'diasEntrega'
         const createdAtCol = nombresColumnas.find(c => c.toLowerCase().includes('created'))
         const updatedAtCol = nombresColumnas.find(c => c.toLowerCase().includes('updated'))
         
         // Generar ID
         const nuevoId = `clx${Date.now()}${Math.random().toString(36).substring(2, 11)}`
         
-        const campos: string[] = ['id', 'nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'activo']
-        const valores: any[] = [nuevoId, dataToCreate.nombre, dataToCreate.contacto, dataToCreate.telefono, dataToCreate.email, dataToCreate.direccion, dataToCreate.rubro, dataToCreate.activo]
+        // Campos REQUERIDOS (NOT NULL) - siempre deben estar
+        const campos: string[] = ['id', 'nombre', 'diasPedido', 'diasEntrega', 'activo']
+        const valores: any[] = [
+          nuevoId, 
+          dataToCreate.nombre, 
+          dataToCreate.diasPedido || '[]', // Asegurar que nunca sea NULL
+          dataToCreate.diasEntrega || '[]', // Asegurar que nunca sea NULL
+          dataToCreate.activo
+        ]
         
+        // Campos opcionales
+        if (nombresColumnas.includes('contacto')) {
+          campos.push('contacto')
+          valores.push(dataToCreate.contacto)
+        }
+        if (nombresColumnas.includes('telefono')) {
+          campos.push('telefono')
+          valores.push(dataToCreate.telefono)
+        }
+        if (nombresColumnas.includes('email')) {
+          campos.push('email')
+          valores.push(dataToCreate.email)
+        }
+        if (nombresColumnas.includes('direccion')) {
+          campos.push('direccion')
+          valores.push(dataToCreate.direccion)
+        }
+        if (nombresColumnas.includes('rubro')) {
+          campos.push('rubro')
+          valores.push(dataToCreate.rubro)
+        }
         if (minimoCompraCol) {
           campos.push(minimoCompraCol)
           valores.push(dataToCreate.minimoCompra)
@@ -231,17 +259,9 @@ export async function POST(request: NextRequest) {
           campos.push(metodoPagoCol)
           valores.push(dataToCreate.metodoPago)
         }
-        if (diasPedidoCol) {
-          campos.push(diasPedidoCol)
-          valores.push(dataToCreate.diasPedido)
-        }
         if (horarioPedidoCol) {
           campos.push(horarioPedidoCol)
           valores.push(dataToCreate.horarioPedido)
-        }
-        if (diasEntregaCol) {
-          campos.push(diasEntregaCol)
-          valores.push(dataToCreate.diasEntrega)
         }
         if (createdAtCol) {
           campos.push(createdAtCol)
