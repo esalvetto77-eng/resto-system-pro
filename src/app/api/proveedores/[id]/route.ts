@@ -408,7 +408,8 @@ export async function DELETE(
     const userIsAdmin = isAdmin(user)
 
     if (userIsAdmin) {
-      // Hard delete: Eliminar completamente el proveedor y sus relaciones
+      // Hard delete: Eliminar completamente el proveedor y sus relaciones usando SQL directo
+      // Esto evita problemas de validación de Prisma con campos adicionales
       await prisma.$transaction(async (tx) => {
         // Eliminar relaciones primero (por las foreign keys)
         await tx.productoProveedor.deleteMany({
@@ -418,23 +419,23 @@ export async function DELETE(
           where: { proveedorId: params.id },
         })
 
-        // Finalmente eliminar el proveedor
-        await tx.proveedor.delete({
-          where: { id: params.id },
-        })
+        // Eliminar el proveedor con SQL directo para evitar validación de schema
+        await tx.$executeRawUnsafe(
+          `DELETE FROM proveedores WHERE id = $1`,
+          params.id
+        )
       })
 
       return NextResponse.json({ message: 'Proveedor eliminado permanentemente' })
     } else {
-      // Soft delete: Marcar como inactivo
-      const proveedor = await prisma.proveedor.update({
-        where: { id: params.id },
-        data: {
-          activo: false,
-        },
-      })
+      // Soft delete: Marcar como inactivo usando SQL directo
+      // Esto evita problemas de validación de Prisma con campos adicionales
+      await prisma.$executeRawUnsafe(
+        `UPDATE proveedores SET "activo" = false WHERE id = $1`,
+        params.id
+      )
 
-      return NextResponse.json(proveedor)
+      return NextResponse.json({ message: 'Proveedor marcado como inactivo' })
     }
   } catch (error: any) {
     console.error('Error en DELETE /api/proveedores/[id]:', error?.message || String(error))
