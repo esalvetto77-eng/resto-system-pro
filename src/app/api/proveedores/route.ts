@@ -210,8 +210,10 @@ export async function POST(request: NextRequest) {
       const campos: string[] = ['id', 'nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'activo', 'created_at', 'updated_at']
       const valores: any[] = []
       
-      // Generar ID
-      const nuevoId = require('crypto').randomUUID ? require('crypto').randomUUID() : `clx${Date.now()}${Math.random().toString(36).substr(2, 9)}`
+      // Generar ID usando cuid (mismo que Prisma)
+      // Usar un ID temporal que luego Prisma puede manejar
+      const { randomBytes } = await import('crypto')
+      const nuevoId = `clx${Date.now()}${randomBytes(8).toString('hex')}`
       valores.push(nuevoId)
       valores.push(dataToCreate.nombre)
       valores.push(dataToCreate.contacto)
