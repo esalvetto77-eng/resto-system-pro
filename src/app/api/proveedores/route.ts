@@ -214,8 +214,8 @@ export async function POST(request: NextRequest) {
          AND column_name IN ('created_at', 'createdat', 'updated_at', 'updatedat')`
       )
       const nombresFecha = columnasFecha.map(c => c.column_name)
-      const createdAtCol = nombresFecha.find(c => c.toLowerCase().includes('created')) || 'createdAt'
-      const updatedAtCol = nombresFecha.find(c => c.toLowerCase().includes('updated')) || 'updatedAt'
+      const createdAtCol = nombresFecha.find(c => c.toLowerCase().includes('created'))
+      const updatedAtCol = nombresFecha.find(c => c.toLowerCase().includes('updated'))
       
       const campos: string[] = ['id', 'nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'activo']
       const valores: any[] = []
@@ -266,12 +266,12 @@ export async function POST(request: NextRequest) {
         valores.push(toStringOrNull(body.banco))
       }
       
-      // Agregar columnas de fecha si existen
-      if (createdAtCol && nombresFecha.includes(createdAtCol)) {
+      // Agregar columnas de fecha si existen (sin fallbacks - solo si realmente existen)
+      if (createdAtCol) {
         campos.push(createdAtCol)
         valores.push(new Date())
       }
-      if (updatedAtCol && nombresFecha.includes(updatedAtCol)) {
+      if (updatedAtCol) {
         campos.push(updatedAtCol)
         valores.push(new Date())
       }
