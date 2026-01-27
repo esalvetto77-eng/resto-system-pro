@@ -154,15 +154,24 @@ export async function POST(request: NextRequest) {
       return null
     }
 
-    // Verificar si los campos adicionales existen antes de intentar guardarlos
-    let camposAdicionalesExisten = false
+    // Verificar qué campos adicionales existen
+    let tieneComentario = false
+    let tieneNumeroCuenta = false
+    let tieneBanco = false
+    
     try {
-      await prisma.$queryRawUnsafe(
-        `SELECT numero_cuenta, banco FROM proveedores LIMIT 1`
+      const columnas = await prisma.$queryRawUnsafe<Array<{column_name: string}>>(
+        `SELECT column_name 
+         FROM information_schema.columns 
+         WHERE table_name = 'proveedores' 
+         AND column_name IN ('comentario', 'numero_cuenta', 'banco')`
       )
-      camposAdicionalesExisten = true
+      const nombresColumnas = columnas.map(c => c.column_name)
+      tieneComentario = nombresColumnas.includes('comentario')
+      tieneNumeroCuenta = nombresColumnas.includes('numero_cuenta')
+      tieneBanco = nombresColumnas.includes('banco')
     } catch (error: any) {
-      camposAdicionalesExisten = false
+      console.log('[API PROVEEDORES POST] Error al verificar campos (continuando sin ellos):', error?.message)
     }
 
     const dataToCreate: any = {
@@ -180,16 +189,132 @@ export async function POST(request: NextRequest) {
       activo: body.activo !== undefined ? Boolean(body.activo) : true,
     }
 
-    // Solo incluir campos adicionales si existen en la BD
-    if (camposAdicionalesExisten) {
-      dataToCreate.comentario = toStringOrNull(body.comentario)
-      dataToCreate.numeroCuenta = toStringOrNull(body.numeroCuenta)
-      dataToCreate.banco = toStringOrNull(body.banco)
+    // Si hay campos adicionales, usar SQL directo para evitar validación de Prisma
+    let proveedor: any
+    
+    if (tieneComentario || tieneNumeroCuenta || tieneBanco) {
+      // Usar SQL directo para crear cuando hay campos adicionales
+      const columnasBasicas = await prisma.$queryRawUnsafe<Array<{column_name: string}>>(
+        `SELECT column_name FROM information_schema.columns 
+         WHERE table_name = 'proveedores' 
+         AND column_name IN ('minimo_compra', 'minimocompra', 'metodo_pago', 'metodopago', 'dias_pedido', 'diaspedido', 'horario_pedido', 'horariopedido', 'dias_entrega', 'diasentrega')`
+      )
+      const nombresBasicos = columnasBasicas.map(c => c.column_name)
+      
+      const minimoCompraCol = nombresBasicos.find(c => c.toLowerCase().includes('minimo') && c.toLowerCase().includes('compra'))
+      const metodoPagoCol = nombresBasicos.find(c => c.toLowerCase().includes('metodo') && c.toLowerCase().includes('pago'))
+      const diasPedidoCol = nombresBasicos.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('pedido'))
+      const horarioPedidoCol = nombresBasicos.find(c => c.toLowerCase().includes('horario') && c.toLowerCase().includes('pedido'))
+      const diasEntregaCol = nombresBasicos.find(c => c.toLowerCase().includes('dias') && c.toLowerCase().includes('entrega'))
+      
+      const campos: string[] = ['id', 'nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'activo', 'created_at', 'updated_at']
+      const valores: any[] = []
+      
+      // Generar ID
+      const nuevoId = require('crypto').randomUUID ? require('crypto').randomUUID() : `clx${Date.now()}${Math.random().toString(36).substr(2, 9)}`
+      valores.push(nuevoId)
+      valores.push(dataToCreate.nombre)
+      valores.push(dataToCreate.contacto)
+      valores.push(dataToCreate.telefono)
+      valores.push(dataToCreate.email)
+      valores.push(dataToCreate.direccion)
+      valores.push(dataToCreate.rubro)
+      valores.push(dataToCreate.activo)
+      
+      if (minimoCompraCol) {
+        campos.push(minimoCompraCol)
+        valores.push(dataToCreate.minimoCompra)
+      }
+      if (metodoPagoCol) {
+        campos.push(metodoPagoCol)
+        valores.push(dataToCreate.metodoPago)
+      }
+      if (diasPedidoCol) {
+        campos.push(diasPedidoCol)
+        valores.push(dataToCreate.diasPedido)
+      }
+      if (horarioPedidoCol) {
+        campos.push(horarioPedidoCol)
+        valores.push(dataToCreate.horarioPedido)
+      }
+      if (diasEntregaCol) {
+        campos.push(diasEntregaCol)
+        valores.push(dataToCreate.diasEntrega)
+      }
+      
+      if (tieneComentario) {
+        campos.push('comentario')
+        valores.push(toStringOrNull(body.comentario))
+      }
+      if (tieneNumeroCuenta) {
+        campos.push('numero_cuenta')
+        valores.push(toStringOrNull(body.numeroCuenta))
+      }
+      if (tieneBanco) {
+        campos.push('banco')
+        valores.push(toStringOrNull(body.banco))
+      }
+      
+      const placeholders = campos.map((_, i) => `$${i + 1}`).join(', ')
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO proveedores (${campos.join(', ')}, created_at, updated_at) 
+         VALUES (${placeholders}, NOW(), NOW())`,
+        ...valores
+      )
+      
+      console.log('[API PROVEEDORES POST] Proveedor creado con SQL directo')
+      
+      // Obtener el proveedor creado con select explícito
+      proveedor = await prisma.proveedor.findUnique({
+        where: { id: nuevoId },
+        select: {
+          id: true,
+          nombre: true,
+          contacto: true,
+          telefono: true,
+          email: true,
+          direccion: true,
+          rubro: true,
+          minimoCompra: true,
+          metodoPago: true,
+          diasPedido: true,
+          horarioPedido: true,
+          diasEntrega: true,
+          activo: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      })
+      
+      // Agregar campos adicionales si existen
+      if (tieneComentario || tieneNumeroCuenta || tieneBanco) {
+        try {
+          const camposAdicionales = await prisma.$queryRawUnsafe<Array<{
+            comentario: string | null,
+            numero_cuenta: string | null,
+            banco: string | null
+          }>>(
+            `SELECT comentario, numero_cuenta, banco FROM proveedores WHERE id = $1`,
+            nuevoId
+          )
+          if (camposAdicionales && camposAdicionales.length > 0) {
+            proveedor = {
+              ...proveedor,
+              comentario: camposAdicionales[0].comentario,
+              numeroCuenta: camposAdicionales[0].numero_cuenta,
+              banco: camposAdicionales[0].banco,
+            }
+          }
+        } catch (error: any) {
+          console.log('[API PROVEEDORES POST] Error al obtener campos adicionales (continuando):', error?.message)
+        }
+      }
+    } else {
+      // Si no hay campos adicionales, usar Prisma normalmente
+      proveedor = await prisma.proveedor.create({
+        data: dataToCreate,
+      })
     }
-
-    const proveedor = await prisma.proveedor.create({
-      data: dataToCreate,
-    })
 
     return NextResponse.json(proveedor, { status: 201 })
   } catch (error: any) {
