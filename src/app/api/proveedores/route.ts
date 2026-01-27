@@ -210,10 +210,9 @@ export async function POST(request: NextRequest) {
       const campos: string[] = ['id', 'nombre', 'contacto', 'telefono', 'email', 'direccion', 'rubro', 'activo', 'created_at', 'updated_at']
       const valores: any[] = []
       
-      // Generar ID usando cuid (mismo que Prisma)
-      // Usar un ID temporal que luego Prisma puede manejar
-      const { randomBytes } = await import('crypto')
-      const nuevoId = `clx${Date.now()}${randomBytes(8).toString('hex')}`
+      // Generar ID (Prisma usa cuid, pero para SQL directo usamos un formato compatible)
+      // Usar timestamp + random para generar un ID único
+      const nuevoId = `clx${Date.now()}${Math.random().toString(36).substring(2, 11)}`
       valores.push(nuevoId)
       valores.push(dataToCreate.nombre)
       valores.push(dataToCreate.contacto)
