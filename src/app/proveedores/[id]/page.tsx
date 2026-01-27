@@ -126,17 +126,49 @@ async function getProveedor(id: string) {
       return null
     }
     
-    // Si el proveedor no tiene campos adicionales, agregarlos como null
-    if (!('comentario' in proveedor) || proveedor.comentario === undefined) {
-      return {
-        ...proveedor,
-        comentario: null,
-        numeroCuenta: null,
-        banco: null,
+    // Agregar campos adicionales si no existen
+    let comentario: string | null = null
+    let numeroCuenta: string | null = null
+    let banco: string | null = null
+    
+    if ('comentario' in proveedor) {
+      comentario = (proveedor as any).comentario || null
+    }
+    if ('numeroCuenta' in proveedor) {
+      numeroCuenta = (proveedor as any).numeroCuenta || null
+    }
+    if ('banco' in proveedor) {
+      banco = (proveedor as any).banco || null
+    }
+    
+    // Si no están en el objeto, intentar obtenerlos con SQL
+    if (comentario === null && numeroCuenta === null && banco === null) {
+      try {
+        const resultado = await prisma.$queryRawUnsafe<Array<{
+          comentario: string | null,
+          numero_cuenta: string | null,
+          banco: string | null
+        }>>(
+          `SELECT comentario, numero_cuenta, banco FROM proveedores WHERE id = $1`,
+          id
+        )
+        if (resultado && resultado.length > 0) {
+          comentario = resultado[0].comentario
+          numeroCuenta = resultado[0].numero_cuenta
+          banco = resultado[0].banco
+        }
+      } catch (error: any) {
+        // Si los campos no existen, usar null
+        console.log('[PAGE PROVEEDOR] Campos adicionales no existen aún, usando null')
       }
     }
     
-    return proveedor
+    return {
+      ...proveedor,
+      comentario,
+      numeroCuenta,
+      banco,
+    }
   }
 }
 
