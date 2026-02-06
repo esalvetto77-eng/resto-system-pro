@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Card, CardHeader, CardBody } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
 
 export default function AddCanalVentaFieldPage() {
   const { isAdmin } = useAuth()
@@ -25,8 +27,8 @@ export default function AddCanalVentaFieldPage() {
           <p className="text-neutral-600 mb-4">
             Solo los administradores pueden acceder a esta página.
           </p>
-          <Link href="/" className="btn btn-primary">
-            Volver al Dashboard
+          <Link href="/">
+            <Button>Volver al Dashboard</Button>
           </Link>
         </div>
       </div>
@@ -84,13 +86,18 @@ export default function AddCanalVentaFieldPage() {
             Agregar el campo canalVenta a la tabla ventas en la base de datos
           </p>
         </div>
-        <Link href="/ventas" className="btn btn-ghost">
-          Volver a Ventas
+        <Link href="/ventas">
+          <Button variant="ghost">Volver a Ventas</Button>
         </Link>
       </div>
 
-      <div className="card">
-        <div className="card-body space-y-4">
+      <Card>
+        <CardHeader>
+          <h2 className="text-lg font-semibold text-[#111111]" style={{ fontWeight: 600, lineHeight: 1.5, letterSpacing: '-0.01em' }}>
+            Información
+          </h2>
+        </CardHeader>
+        <CardBody className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold text-neutral-900 mb-2">
               ¿Qué hace esto?
@@ -127,19 +134,18 @@ export default function AddCanalVentaFieldPage() {
           )}
 
           <div className="flex space-x-4 pt-4">
-            <button
+            <Button
               onClick={handleAddField}
               disabled={loading}
-              className="btn btn-primary"
             >
               {loading ? 'Agregando campo...' : 'Agregar Campo Canal de Venta'}
-            </button>
-            <Link href="/ventas" className="btn btn-ghost">
-              Cancelar
+            </Button>
+            <Link href="/ventas">
+              <Button variant="ghost">Cancelar</Button>
             </Link>
           </div>
-        </div>
-      </div>
+        </CardBody>
+      </Card>
     </div>
   )
 }
