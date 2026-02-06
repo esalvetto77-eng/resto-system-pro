@@ -70,6 +70,8 @@ export default function VentasPage() {
   const [canalVentaFiltro, setCanalVentaFiltro] = useState<string>('')
   const [mounted, setMounted] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [addingCanalVenta, setAddingCanalVenta] = useState(false)
+  const [canalVentaResult, setCanalVentaResult] = useState<{success: boolean, message: string} | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -198,6 +200,50 @@ export default function VentasPage() {
     }
   }
 
+  async function handleAddCanalVentaField() {
+    if (!confirm('¿Estás seguro de que deseas agregar el campo canalVenta a la tabla ventas?')) {
+      return
+    }
+
+    setAddingCanalVenta(true)
+    setCanalVentaResult(null)
+
+    try {
+      const response = await fetch('/api/admin/add-canal-venta-field', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setCanalVentaResult({
+          success: true,
+          message: data.message || 'Campo agregado exitosamente',
+        })
+        // Recargar la página después de 2 segundos para ver los cambios
+        setTimeout(() => {
+          window.location.reload()
+        }, 2000)
+      } else {
+        setCanalVentaResult({
+          success: false,
+          message: data.error || data.message || 'Error desconocido',
+        })
+      }
+    } catch (error: any) {
+      setCanalVentaResult({
+        success: false,
+        message: error?.message || 'Error al agregar el campo',
+      })
+    } finally {
+      setAddingCanalVenta(false)
+    }
+  }
+
   async function handleDelete(ventaId: string) {
     if (!confirm('¿Estás seguro de que deseas eliminar esta venta? Esta acción no se puede deshacer.')) {
       return
@@ -284,6 +330,46 @@ export default function VentasPage() {
           </Button>
         </Link>
       </div>
+
+      {/* Botón para agregar campo canalVenta (solo admin) */}
+      {isAdmin && (
+        <Card>
+          <CardBody>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-neutral-700 mb-1">
+                  Configuración de Base de Datos
+                </h3>
+                <p className="text-xs text-neutral-500">
+                  Si no aparece el campo "Canal de Venta" al crear ventas, haz clic aquí para agregarlo
+                </p>
+              </div>
+              <Button
+                onClick={handleAddCanalVentaField}
+                disabled={addingCanalVenta}
+                variant="ghost"
+                size="sm"
+              >
+                {addingCanalVenta ? 'Agregando...' : 'Agregar Campo Canal de Venta'}
+              </Button>
+            </div>
+            {canalVentaResult && (
+              <div
+                className={`mt-3 p-3 rounded-lg ${
+                  canalVentaResult.success
+                    ? 'bg-green-50 border border-green-200 text-green-800'
+                    : 'bg-red-50 border border-red-200 text-red-800'
+                }`}
+              >
+                <p className="text-sm font-medium">
+                  {canalVentaResult.success ? '✅ ' : '❌ '}
+                  {canalVentaResult.message}
+                </p>
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      )}
 
       {/* Filtros */}
       <Card>
