@@ -2,14 +2,12 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 
 export default function AddCanalVentaFieldPage() {
   const { isAdmin } = useAuth()
-  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{
     success: boolean
@@ -17,25 +15,15 @@ export default function AddCanalVentaFieldPage() {
     yaExistia?: boolean
   } | null>(null)
 
-  if (!isAdmin()) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">
-            Acceso Denegado
-          </h2>
-          <p className="text-neutral-600 mb-4">
-            Solo los administradores pueden acceder a esta página.
-          </p>
-          <Link href="/">
-            <Button>Volver al Dashboard</Button>
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
   const handleAddField = async () => {
+    if (!isAdmin()) {
+      setResult({
+        success: false,
+        message: 'No tienes permisos de administrador',
+      })
+      return
+    }
+
     if (!confirm('¿Estás seguro de que deseas agregar el campo canalVenta a la tabla ventas?')) {
       return
     }
@@ -49,6 +37,7 @@ export default function AddCanalVentaFieldPage() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
       })
 
       const data = await response.json()
@@ -75,20 +64,35 @@ export default function AddCanalVentaFieldPage() {
     }
   }
 
+  if (!isAdmin()) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card>
+          <CardBody>
+            <h2 className="text-2xl font-bold text-red-600 mb-4">
+              Acceso Denegado
+            </h2>
+            <p className="text-neutral-600 mb-4">
+              Solo los administradores pueden acceder a esta página.
+            </p>
+            <Link href="/">
+              <Button>Volver al Dashboard</Button>
+            </Link>
+          </CardBody>
+        </Card>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-neutral-900">
-            Agregar Campo Canal de Venta
-          </h1>
-          <p className="text-neutral-600 mt-1">
-            Agregar el campo canalVenta a la tabla ventas en la base de datos
-          </p>
-        </div>
-        <Link href="/ventas">
-          <Button variant="ghost">Volver a Ventas</Button>
-        </Link>
+    <div className="space-y-6 max-w-2xl mx-auto">
+      <div>
+        <h1 className="text-3xl font-semibold text-[#111111] mb-2" style={{ fontWeight: 600, lineHeight: 1.5, letterSpacing: '-0.01em' }}>
+          Agregar Campo Canal de Venta
+        </h1>
+        <p className="text-neutral-600">
+          Agregar el campo canalVenta a la tabla ventas en la base de datos
+        </p>
       </div>
 
       <Card>
@@ -99,9 +103,6 @@ export default function AddCanalVentaFieldPage() {
         </CardHeader>
         <CardBody className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold text-neutral-900 mb-2">
-              ¿Qué hace esto?
-            </h2>
             <p className="text-neutral-600">
               Este proceso agregará la columna <code className="bg-neutral-100 px-2 py-1 rounded">canalVenta</code> a la tabla <code className="bg-neutral-100 px-2 py-1 rounded">ventas</code> en la base de datos de producción.
             </p>
