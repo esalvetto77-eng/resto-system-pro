@@ -105,7 +105,7 @@ export async function PUT(
     }
 
     // Validar canalVenta si se proporciona
-    const canalesValidos = ['Local', 'Mesas', 'PedidosYa', 'Poked', 'Rainbowl']
+    const canalesValidos = ['Local', 'Mesas', 'PedidosYa', 'Poked', 'Rainbowl', 'Volar']
     if (body.canalVenta && !canalesValidos.includes(body.canalVenta)) {
       return NextResponse.json(
         { error: 'El canal de venta no es válido' },

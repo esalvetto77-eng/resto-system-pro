@@ -287,7 +287,7 @@ export default function VentasPage() {
 
   // Calcular totales por canal de venta
   const calcularTotalesPorCanal = () => {
-    const canales = ['Local', 'Mesas', 'PedidosYa', 'Poked', 'Rainbowl']
+    const canales = ['Local', 'Mesas', 'PedidosYa', 'Poked', 'Rainbowl', 'Volar']
     const totales: Record<string, { monto: number; cantidad: number }> = {}
     
     // Inicializar todos los canales
@@ -435,6 +435,7 @@ export default function VentasPage() {
                 <option value="PedidosYa">PedidosYa</option>
                 <option value="Poked">Poked</option>
                 <option value="Rainbowl">Rainbowl</option>
+                <option value="Volar">Volar</option>
               </select>
             </div>
           </div>

@@ -487,7 +487,7 @@ model Venta {
   fecha         DateTime    @default(now())
   monto         Float
   tipoTurno     String      // 'DAY' o 'NIGHT'
-  canalVenta    String?     // 'Local', 'Mesas', 'PedidosYa', 'Poked', 'Rainbowl'
+  canalVenta    String?     // 'Local', 'Mesas', 'PedidosYa', 'Poked', 'Rainbowl', 'Volar'
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   restaurante   Restaurante @relation(fields: [restauranteId], references: [id], onDelete: Cascade)

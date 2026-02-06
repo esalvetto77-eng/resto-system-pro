@@ -107,7 +107,7 @@ export default function AddCanalVentaFieldPage() {
               Este proceso agregará la columna <code className="bg-neutral-100 px-2 py-1 rounded">canalVenta</code> a la tabla <code className="bg-neutral-100 px-2 py-1 rounded">ventas</code> en la base de datos de producción.
             </p>
             <p className="text-neutral-600 mt-2">
-              Esto es necesario para que puedas especificar el canal de venta (Local, Mesas, PedidosYa, Poked, Rainbowl) al crear y editar ventas.
+              Esto es necesario para que puedas especificar el canal de venta (Local, Mesas, PedidosYa, Poked, Rainbowl, Volar) al crear y editar ventas.
             </p>
           </div>
 

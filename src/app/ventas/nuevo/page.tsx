@@ -16,7 +16,7 @@ export default function NuevaVentaPage() {
     restauranteId: '',
     monto: '',
     tipoTurno: 'DAY' as 'DAY' | 'NIGHT',
-    canalVenta: '' as '' | 'Local' | 'Mesas' | 'PedidosYa' | 'Poked' | 'Rainbowl',
+    canalVenta: '' as '' | 'Local' | 'Mesas' | 'PedidosYa' | 'Poked' | 'Rainbowl' | 'Volar',
     fecha: new Date().toISOString().split('T')[0],
   })
   const [created, setCreated] = useState(false)
@@ -198,7 +198,7 @@ export default function NuevaVentaPage() {
                   className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-terracotta-500 focus:border-transparent"
                   value={formData.canalVenta}
                   onChange={(e) =>
-                    setFormData({ ...formData, canalVenta: e.target.value as '' | 'Local' | 'Mesas' | 'PedidosYa' | 'Poked' | 'Rainbowl' })
+                    setFormData({ ...formData, canalVenta: e.target.value as '' | 'Local' | 'Mesas' | 'PedidosYa' | 'Poked' | 'Rainbowl' | 'Volar' })
                   }
                 >
                   <option value="">Seleccionar canal (opcional)</option>
@@ -207,6 +207,7 @@ export default function NuevaVentaPage() {
                   <option value="PedidosYa">PedidosYa</option>
                   <option value="Poked">Poked</option>
                   <option value="Rainbowl">Rainbowl</option>
+                  <option value="Volar">Volar</option>
                 </select>
               </div>
 
