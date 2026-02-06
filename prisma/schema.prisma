@@ -487,6 +487,7 @@ model Venta {
   fecha         DateTime    @default(now())
   monto         Float
   tipoTurno     String      // 'DAY' o 'NIGHT'
+  canalVenta    String?     // 'Local', 'Mesas', 'PedidosYa', 'Poked', 'Rainbowl'
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   restaurante   Restaurante @relation(fields: [restauranteId], references: [id], onDelete: Cascade)
@@ -494,6 +495,7 @@ model Venta {
   @@index([restauranteId])
   @@index([fecha])
   @@index([tipoTurno])
+  @@index([canalVenta])
   @@index([fecha, tipoTurno])
   @@map("ventas")
 }

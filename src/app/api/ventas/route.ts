@@ -65,12 +65,22 @@ export async function POST(request: NextRequest) {
       console.log('Usando fecha actual:', fechaVenta.toISOString())
     }
 
+    // Validar canalVenta si se proporciona
+    const canalesValidos = ['Local', 'Mesas', 'PedidosYa', 'Poked', 'Rainbowl']
+    if (body.canalVenta && !canalesValidos.includes(body.canalVenta)) {
+      return NextResponse.json(
+        { error: 'El canal de venta no es válido' },
+        { status: 400 }
+      )
+    }
+
     // Crear la venta
     const venta = await prisma.venta.create({
       data: {
         restauranteId: body.restauranteId,
         monto: body.monto,
         tipoTurno: body.tipoTurno,
+        canalVenta: body.canalVenta || null,
         fecha: fechaVenta,
       },
       include: {
@@ -139,6 +149,10 @@ export async function GET(request: NextRequest) {
     if (restauranteId) where.restauranteId = restauranteId
     if (tipoTurno && ['DAY', 'NIGHT'].includes(tipoTurno)) {
       where.tipoTurno = tipoTurno
+    }
+    const canalVenta = searchParams.get('canalVenta')
+    if (canalVenta && ['Local', 'Mesas', 'PedidosYa', 'Poked', 'Rainbowl'].includes(canalVenta)) {
+      where.canalVenta = canalVenta
     }
     if (fechaDesde || fechaHasta) {
       where.fecha = {}

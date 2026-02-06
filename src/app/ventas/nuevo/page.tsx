@@ -16,6 +16,7 @@ export default function NuevaVentaPage() {
     restauranteId: '',
     monto: '',
     tipoTurno: 'DAY' as 'DAY' | 'NIGHT',
+    canalVenta: '' as '' | 'Local' | 'Mesas' | 'PedidosYa' | 'Poked' | 'Rainbowl',
     fecha: new Date().toISOString().split('T')[0],
   })
   const [created, setCreated] = useState(false)
@@ -57,6 +58,7 @@ export default function NuevaVentaPage() {
           restauranteId: formData.restauranteId,
           monto,
           tipoTurno: formData.tipoTurno,
+          canalVenta: formData.canalVenta || undefined,
           fecha: formData.fecha || undefined, // Enviar como string YYYY-MM-DD
         }),
       })
@@ -77,6 +79,7 @@ export default function NuevaVentaPage() {
           restauranteId: restaurantes.length > 0 ? restaurantes[0].id : '',
           monto: '',
           tipoTurno: 'DAY',
+          canalVenta: '',
           fecha: new Date().toISOString().split('T')[0],
         })
         setCreated(false)
@@ -184,6 +187,26 @@ export default function NuevaVentaPage() {
                 >
                   <option value="DAY">Día</option>
                   <option value="NIGHT">Noche</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1" style={{ fontWeight: 500 }}>
+                  Canal de Venta
+                </label>
+                <select
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-terracotta-500 focus:border-transparent"
+                  value={formData.canalVenta}
+                  onChange={(e) =>
+                    setFormData({ ...formData, canalVenta: e.target.value as '' | 'Local' | 'Mesas' | 'PedidosYa' | 'Poked' | 'Rainbowl' })
+                  }
+                >
+                  <option value="">Seleccionar canal (opcional)</option>
+                  <option value="Local">Local</option>
+                  <option value="Mesas">Mesas</option>
+                  <option value="PedidosYa">PedidosYa</option>
+                  <option value="Poked">Poked</option>
+                  <option value="Rainbowl">Rainbowl</option>
                 </select>
               </div>
 

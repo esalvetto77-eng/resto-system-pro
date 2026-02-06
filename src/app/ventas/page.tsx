@@ -17,6 +17,7 @@ interface Venta {
   fecha: string
   monto: number
   tipoTurno: 'DAY' | 'NIGHT'
+  canalVenta?: string | null
   restaurante: {
     id: string
     nombre: string
@@ -66,6 +67,7 @@ export default function VentasPage() {
   const [stats, setStats] = useState<VentasStats | null>(null)
   const [loading, setLoading] = useState(false)
   const [restauranteFiltro, setRestauranteFiltro] = useState<string>('')
+  const [canalVentaFiltro, setCanalVentaFiltro] = useState<string>('')
   const [mounted, setMounted] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -86,14 +88,20 @@ export default function VentasPage() {
       fetchVentas()
       fetchStats()
     }
-  }, [mounted, isAdmin, restauranteFiltro, authLoading])
+  }, [mounted, isAdmin, restauranteFiltro, canalVentaFiltro, authLoading])
 
   async function fetchVentas() {
     try {
       setLoading(true)
-      const url = restauranteFiltro
-        ? `/api/ventas?restauranteId=${restauranteFiltro}`
-        : '/api/ventas'
+      const params = new URLSearchParams()
+      if (restauranteFiltro) {
+        params.append('restauranteId', restauranteFiltro)
+      }
+      if (canalVentaFiltro) {
+        params.append('canalVenta', canalVentaFiltro)
+      }
+      const queryString = params.toString()
+      const url = queryString ? `/api/ventas?${queryString}` : '/api/ventas'
       
       // Agregar opciones para evitar problemas de caché y red
       const response = await fetch(url, {
@@ -277,25 +285,44 @@ export default function VentasPage() {
         </Link>
       </div>
 
-      {/* Filtro por restaurante */}
+      {/* Filtros */}
       <Card>
         <CardBody>
-          <div className="flex items-center space-x-4">
-            <label className="text-sm font-medium text-neutral-700" style={{ fontWeight: 500 }}>
-              Filtrar por restaurante:
-            </label>
-            <select
-              className="px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-terracotta-500 focus:border-transparent"
-              value={restauranteFiltro}
-              onChange={(e) => setRestauranteFiltro(e.target.value)}
-            >
-              <option value="">Todos los restaurantes</option>
-              {restaurantes.map((restaurante) => (
-                <option key={restaurante.id} value={restaurante.id}>
-                  {restaurante.nombre}
-                </option>
-              ))}
-            </select>
+          <div className="flex items-center space-x-4 flex-wrap gap-4">
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-neutral-700" style={{ fontWeight: 500 }}>
+                Restaurante:
+              </label>
+              <select
+                className="px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-terracotta-500 focus:border-transparent"
+                value={restauranteFiltro}
+                onChange={(e) => setRestauranteFiltro(e.target.value)}
+              >
+                <option value="">Todos</option>
+                {restaurantes.map((restaurante) => (
+                  <option key={restaurante.id} value={restaurante.id}>
+                    {restaurante.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-neutral-700" style={{ fontWeight: 500 }}>
+                Canal de Venta:
+              </label>
+              <select
+                className="px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-terracotta-500 focus:border-transparent"
+                value={canalVentaFiltro}
+                onChange={(e) => setCanalVentaFiltro(e.target.value)}
+              >
+                <option value="">Todos</option>
+                <option value="Local">Local</option>
+                <option value="Mesas">Mesas</option>
+                <option value="PedidosYa">PedidosYa</option>
+                <option value="Poked">Poked</option>
+                <option value="Rainbowl">Rainbowl</option>
+              </select>
+            </div>
           </div>
         </CardBody>
       </Card>
@@ -421,6 +448,7 @@ export default function VentasPage() {
                   <TableCell header>Fecha</TableCell>
                   <TableCell header>Restaurante</TableCell>
                   <TableCell header>Turno</TableCell>
+                  <TableCell header>Canal</TableCell>
                   <TableCell header className="text-right">Monto</TableCell>
                   {(canEdit() || canDelete()) && (
                     <TableCell header className="text-right">Acciones</TableCell>
@@ -444,6 +472,15 @@ export default function VentasPage() {
                       <Badge variant={venta.tipoTurno === 'DAY' ? 'neutral' : 'neutral'}>
                         {venta.tipoTurno === 'DAY' ? 'Día' : 'Noche'}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {venta.canalVenta ? (
+                        <Badge variant="neutral">
+                          {venta.canalVenta}
+                        </Badge>
+                      ) : (
+                        <span className="text-neutral-400 text-sm">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="font-medium text-[#111111]" style={{ fontWeight: 500 }}>

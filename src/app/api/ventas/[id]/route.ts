@@ -104,6 +104,15 @@ export async function PUT(
       )
     }
 
+    // Validar canalVenta si se proporciona
+    const canalesValidos = ['Local', 'Mesas', 'PedidosYa', 'Poked', 'Rainbowl']
+    if (body.canalVenta && !canalesValidos.includes(body.canalVenta)) {
+      return NextResponse.json(
+        { error: 'El canal de venta no es válido' },
+        { status: 400 }
+      )
+    }
+
     // Verificar que el restaurante existe
     const restaurante = await prisma.restaurante.findUnique({
       where: { id: body.restauranteId },
@@ -147,6 +156,7 @@ export async function PUT(
         restauranteId: body.restauranteId,
         monto: body.monto,
         tipoTurno: body.tipoTurno,
+        canalVenta: body.canalVenta || null,
         fecha: fechaVenta,
       },
       include: {
