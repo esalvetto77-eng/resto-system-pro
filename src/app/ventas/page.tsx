@@ -285,6 +285,34 @@ export default function VentasPage() {
     }
   }
 
+  // Calcular totales por canal de venta
+  const calcularTotalesPorCanal = () => {
+    const canales = ['Local', 'Mesas', 'PedidosYa', 'Poked', 'Rainbowl']
+    const totales: Record<string, { monto: number; cantidad: number }> = {}
+    
+    // Inicializar todos los canales
+    canales.forEach(canal => {
+      totales[canal] = { monto: 0, cantidad: 0 }
+    })
+    
+    // Agregar "Sin Canal" para ventas sin canal asignado
+    totales['Sin Canal'] = { monto: 0, cantidad: 0 }
+    
+    // Calcular totales
+    ventas.forEach(venta => {
+      const canal = venta.canalVenta || 'Sin Canal'
+      if (!totales[canal]) {
+        totales[canal] = { monto: 0, cantidad: 0 }
+      }
+      totales[canal].monto += venta.monto
+      totales[canal].cantidad += 1
+    })
+    
+    return totales
+  }
+
+  const totalesPorCanal = calcularTotalesPorCanal()
+
   // Si no está montado aún, mostrar carga
   if (!mounted) {
     return (
@@ -418,6 +446,44 @@ export default function VentasPage() {
         <Card>
           <CardBody className="text-center py-12">
             <div className="text-neutral-600">Cargando estadísticas...</div>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Totales por Canal de Venta */}
+      {ventas.length > 0 && (
+        <Card>
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-[#111111]" style={{ fontWeight: 600, lineHeight: 1.5, letterSpacing: '-0.01em' }}>
+              Totales por Canal de Venta
+            </h2>
+          </CardHeader>
+          <CardBody>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+              {Object.entries(totalesPorCanal)
+                .filter(([canal, datos]) => datos.cantidad > 0 || canal === 'Sin Canal')
+                .map(([canal, datos]) => (
+                  <div
+                    key={canal}
+                    className="p-4 border border-neutral-200 rounded-lg bg-white"
+                  >
+                    <div className="text-sm font-medium text-neutral-500 mb-1">
+                      {canal}
+                    </div>
+                    <div className="text-xl font-semibold text-[#111111]" style={{ fontWeight: 600 }}>
+                      {formatCurrency(datos.monto)}
+                    </div>
+                    <div className="text-xs text-neutral-600 mt-1">
+                      {datos.cantidad} {datos.cantidad === 1 ? 'venta' : 'ventas'}
+                    </div>
+                  </div>
+                ))}
+            </div>
+            {Object.values(totalesPorCanal).every(datos => datos.cantidad === 0) && (
+              <p className="text-sm text-neutral-500 text-center py-4">
+                No hay ventas con canal de venta asignado en los resultados actuales
+              </p>
+            )}
           </CardBody>
         </Card>
       )}
