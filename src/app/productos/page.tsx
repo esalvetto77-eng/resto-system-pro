@@ -31,57 +31,86 @@ interface Producto {
   }>
 }
 
+interface Proveedor {
+  id: string
+  nombre: string
+}
+
 export default function ProductosPage() {
   const router = useRouter()
   const { canEdit, canSeePrices, canDelete } = useAuth()
   const [productos, setProductos] = useState<Producto[]>([])
+  const [proveedores, setProveedores] = useState<Proveedor[]>([])
+  const [proveedorFiltro, setProveedorFiltro] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  // Cargar proveedores
   useEffect(() => {
-    async function fetchProductos() {
+    async function fetchProveedores() {
       try {
-        setLoading(true)
-        const response = await fetch('/api/productos?activo=true')
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          console.error('Error al cargar productos:', response.status, errorData)
-          setProductos([])
-          return
+        const response = await fetch('/api/proveedores')
+        if (response.ok) {
+          const data = await response.json()
+          setProveedores(data)
         }
-        
-        const data = await response.json()
-        console.log('Productos recibidos:', data)
-        console.log('Es array?', Array.isArray(data))
-        console.log('Cantidad de productos:', Array.isArray(data) ? data.length : 0)
-        
-        // Log para debugging de moneda
-        if (Array.isArray(data)) {
-          data.forEach((producto: any) => {
-            producto.proveedores?.forEach((pp: any) => {
-              if (pp.moneda === 'USD' || pp.precioEnDolares) {
-                console.log('[PRODUCTOS] Producto en USD:', producto.nombre, {
-                  proveedor: pp.proveedor?.nombre,
-                  moneda: pp.moneda,
-                  precioEnDolares: pp.precioEnDolares,
-                  precioCompra: pp.precioCompra
-                })
-              }
-            })
-          })
-        }
-        
-        setProductos(Array.isArray(data) ? data : [])
       } catch (error) {
-        console.error('Error al cargar productos:', error)
-        setProductos([])
-      } finally {
-        setLoading(false)
+        console.error('Error al cargar proveedores:', error)
       }
     }
-    fetchProductos()
+    fetchProveedores()
   }, [])
+
+  async function fetchProductos() {
+    try {
+      setLoading(true)
+      const url = proveedorFiltro 
+        ? `/api/productos?activo=true&proveedorId=${proveedorFiltro}`
+        : '/api/productos?activo=true'
+      const response = await fetch(url)
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Error al cargar productos:', response.status, errorData)
+        setProductos([])
+        return
+      }
+      
+      const data = await response.json()
+      console.log('Productos recibidos:', data)
+      console.log('Es array?', Array.isArray(data))
+      console.log('Cantidad de productos:', Array.isArray(data) ? data.length : 0)
+      
+      // Log para debugging de moneda
+      if (Array.isArray(data)) {
+        data.forEach((producto: any) => {
+          producto.proveedores?.forEach((pp: any) => {
+            if (pp.moneda === 'USD' || pp.precioEnDolares) {
+              console.log('[PRODUCTOS] Producto en USD:', producto.nombre, {
+                proveedor: pp.proveedor?.nombre,
+                moneda: pp.moneda,
+                precioEnDolares: pp.precioEnDolares,
+                precioCompra: pp.precioCompra
+              })
+            }
+          })
+        })
+      }
+      
+      setProductos(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error('Error al cargar productos:', error)
+      setProductos([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Cargar productos al montar y cuando cambia el filtro
+  useEffect(() => {
+    fetchProductos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proveedorFiltro])
 
   async function handleDelete(id: string) {
     if (!confirm('¿Estás seguro de que deseas eliminar permanentemente este producto? Esta acción no se puede deshacer.')) {
@@ -107,31 +136,6 @@ export default function ProductosPage() {
       alert(error?.message || 'Error al eliminar el producto')
     } finally {
       setDeletingId(null)
-    }
-  }
-
-  async function fetchProductos() {
-    try {
-      setLoading(true)
-      const response = await fetch('/api/productos?activo=true')
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('Error al cargar productos:', response.status, errorData)
-        setProductos([])
-        return
-      }
-      
-      const data = await response.json()
-      console.log('Productos recibidos:', data)
-      console.log('Es array?', Array.isArray(data))
-      console.log('Cantidad de productos:', Array.isArray(data) ? data.length : 0)
-      setProductos(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error('Error al cargar productos:', error)
-      setProductos([])
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -162,21 +166,67 @@ export default function ProductosPage() {
         )}
       </div>
 
+      {/* Filtro de Proveedores */}
+      <Card>
+        <CardBody>
+          <div className="flex items-center gap-4">
+          <label htmlFor="proveedor-filtro" className="text-sm font-medium text-neutral-700">
+            Filtrar por proveedor:
+          </label>
+          <select
+            id="proveedor-filtro"
+            value={proveedorFiltro}
+            onChange={(e) => setProveedorFiltro(e.target.value)}
+            className="px-3 py-2 border border-neutral-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-500 focus:border-terracotta-500 bg-white text-neutral-900"
+          >
+            <option value="">Todos los proveedores</option>
+            {proveedores.map((proveedor) => (
+              <option key={proveedor.id} value={proveedor.id}>
+                {proveedor.nombre}
+              </option>
+            ))}
+          </select>
+          {proveedorFiltro && (
+            <button
+              onClick={() => setProveedorFiltro('')}
+              className="text-sm text-neutral-600 hover:text-neutral-900 underline"
+            >
+              Limpiar filtro
+            </button>
+          )}
+        </div>
+        </CardBody>
+      </Card>
+
       {/* Empty State */}
       {productos.length === 0 ? (
         <Card>
           <CardBody className="text-center py-16">
             <h3 className="text-xl font-semibold text-[#111111] mb-2" style={{ fontWeight: 600, lineHeight: 1.5, letterSpacing: '-0.01em' }}>
-              No hay productos registrados
+              {proveedorFiltro 
+                ? 'No hay productos para este proveedor'
+                : 'No hay productos registrados'}
             </h3>
             <p className="text-neutral-600 mb-6 max-w-md mx-auto">
-              Comienza agregando tu primer producto al sistema.
+              {proveedorFiltro 
+                ? 'Este proveedor no tiene productos asociados o no hay productos activos.'
+                : 'Comienza agregando tu primer producto al sistema.'}
             </p>
-            <Link href="/productos/nuevo">
-              <Button size="lg">
-                Crear primer producto
-              </Button>
-            </Link>
+            {!proveedorFiltro && (
+              <Link href="/productos/nuevo">
+                <Button size="lg">
+                  Crear primer producto
+                </Button>
+              </Link>
+            )}
+            {proveedorFiltro && (
+              <button
+                onClick={() => setProveedorFiltro('')}
+                className="text-sm text-terracotta-600 hover:text-terracotta-700 underline"
+              >
+                Ver todos los productos
+              </button>
+            )}
           </CardBody>
         </Card>
       ) : (

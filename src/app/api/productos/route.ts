@@ -10,19 +10,33 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const soloActivos = searchParams.get('activo') === 'true'
+  const proveedorId = searchParams.get('proveedorId')
   try {
     console.log('[API PRODUCTOS] Iniciando consulta de productos...')
     console.log('[API PRODUCTOS] Solo activos:', soloActivos)
+    console.log('[API PRODUCTOS] Proveedor ID:', proveedorId)
+    
+    // Construir el where clause
+    const whereClause: any = soloActivos ? { activo: true } : {}
+    
+    // Si hay un proveedorId, filtrar productos que tengan ese proveedor
+    if (proveedorId) {
+      whereClause.proveedores = {
+        some: {
+          proveedorId: proveedorId
+        }
+      }
+    }
     
     // Primero hacer una consulta simple para verificar que hay productos
     const countProductos = await prisma.producto.count({
-      where: soloActivos ? { activo: true } : {},
+      where: whereClause,
     })
     console.log('[API PRODUCTOS] Total productos en BD:', countProductos)
     
     // Usar select explícito para evitar leer campos que no existen
     const productos = await prisma.producto.findMany({
-      where: soloActivos ? { activo: true } : {},
+      where: whereClause,
       select: {
         id: true,
         nombre: true,
