@@ -1,9 +1,10 @@
 // Página de listado de Productos
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { Search } from 'lucide-react'
 import { formatCurrency, calcularEstadoInventario } from '@/lib/utils'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -42,6 +43,7 @@ export default function ProductosPage() {
   const [productos, setProductos] = useState<Producto[]>([])
   const [proveedores, setProveedores] = useState<Proveedor[]>([])
   const [proveedorFiltro, setProveedorFiltro] = useState<string>('')
+  const [busqueda, setBusqueda] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
@@ -112,6 +114,40 @@ export default function ProductosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proveedorFiltro])
 
+  // Filtrar productos por término de búsqueda
+  const productosFiltrados = useMemo(() => {
+    if (!busqueda.trim()) {
+      return productos
+    }
+
+    const terminoBusqueda = busqueda.toLowerCase().trim()
+    return productos.filter((producto) => {
+      // Buscar en nombre
+      if (producto.nombre.toLowerCase().includes(terminoBusqueda)) {
+        return true
+      }
+      
+      // Buscar en código
+      if (producto.codigo && producto.codigo.toLowerCase().includes(terminoBusqueda)) {
+        return true
+      }
+      
+      // Buscar en rubro
+      if (producto.rubro && producto.rubro.toLowerCase().includes(terminoBusqueda)) {
+        return true
+      }
+      
+      // Buscar en nombres de proveedores
+      if (producto.proveedores.some(pp => 
+        pp.proveedor.nombre.toLowerCase().includes(terminoBusqueda)
+      )) {
+        return true
+      }
+      
+      return false
+    })
+  }, [productos, busqueda])
+
   async function handleDelete(id: string) {
     if (!confirm('¿Estás seguro de que deseas eliminar permanentemente este producto? Esta acción no se puede deshacer.')) {
       return
@@ -166,62 +202,106 @@ export default function ProductosPage() {
         )}
       </div>
 
-      {/* Filtro de Proveedores */}
+      {/* Filtros */}
       <Card>
         <CardBody>
-          <div className="flex items-center gap-4">
-          <label htmlFor="proveedor-filtro" className="text-sm font-medium text-neutral-700">
-            Filtrar por proveedor:
-          </label>
-          <select
-            id="proveedor-filtro"
-            value={proveedorFiltro}
-            onChange={(e) => setProveedorFiltro(e.target.value)}
-            className="px-3 py-2 border border-neutral-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-500 focus:border-terracotta-500 bg-white text-neutral-900"
-          >
-            <option value="">Todos los proveedores</option>
-            {proveedores.map((proveedor) => (
-              <option key={proveedor.id} value={proveedor.id}>
-                {proveedor.nombre}
-              </option>
-            ))}
-          </select>
-          {proveedorFiltro && (
-            <button
-              onClick={() => setProveedorFiltro('')}
-              className="text-sm text-neutral-600 hover:text-neutral-900 underline"
-            >
-              Limpiar filtro
-            </button>
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Búsqueda */}
+            <div className="flex-1">
+              <label htmlFor="busqueda-producto" className="block text-sm font-medium text-neutral-700 mb-2">
+                Buscar producto:
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 w-4 h-4" />
+                <input
+                  id="busqueda-producto"
+                  type="text"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  placeholder="Buscar por nombre, código, rubro o proveedor..."
+                  className="w-full pl-10 pr-4 py-2 border border-neutral-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-500 focus:border-terracotta-500 bg-white text-neutral-900"
+                />
+              </div>
+            </div>
+            
+            {/* Filtro de Proveedores */}
+            <div className="sm:w-64">
+              <label htmlFor="proveedor-filtro" className="block text-sm font-medium text-neutral-700 mb-2">
+                Filtrar por proveedor:
+              </label>
+              <div className="flex items-center gap-2">
+                <select
+                  id="proveedor-filtro"
+                  value={proveedorFiltro}
+                  onChange={(e) => setProveedorFiltro(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-neutral-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-terracotta-500 focus:border-terracotta-500 bg-white text-neutral-900"
+                >
+                  <option value="">Todos los proveedores</option>
+                  {proveedores.map((proveedor) => (
+                    <option key={proveedor.id} value={proveedor.id}>
+                      {proveedor.nombre}
+                    </option>
+                  ))}
+                </select>
+                {proveedorFiltro && (
+                  <button
+                    onClick={() => setProveedorFiltro('')}
+                    className="text-sm text-neutral-600 hover:text-neutral-900 underline whitespace-nowrap"
+                    title="Limpiar filtro"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+          {(busqueda || proveedorFiltro) && (
+            <div className="mt-3 pt-3 border-t border-neutral-200">
+              <button
+                onClick={() => {
+                  setBusqueda('')
+                  setProveedorFiltro('')
+                }}
+                className="text-sm text-terracotta-600 hover:text-terracotta-700 underline"
+              >
+                Limpiar todos los filtros
+              </button>
+            </div>
           )}
-        </div>
         </CardBody>
       </Card>
 
       {/* Empty State */}
-      {productos.length === 0 ? (
+      {productosFiltrados.length === 0 ? (
         <Card>
           <CardBody className="text-center py-16">
             <h3 className="text-xl font-semibold text-[#111111] mb-2" style={{ fontWeight: 600, lineHeight: 1.5, letterSpacing: '-0.01em' }}>
-              {proveedorFiltro 
-                ? 'No hay productos para este proveedor'
-                : 'No hay productos registrados'}
+              {productos.length === 0
+                ? 'No hay productos registrados'
+                : busqueda || proveedorFiltro
+                ? 'No se encontraron productos'
+                : 'No hay productos para este proveedor'}
             </h3>
             <p className="text-neutral-600 mb-6 max-w-md mx-auto">
-              {proveedorFiltro 
-                ? 'Este proveedor no tiene productos asociados o no hay productos activos.'
-                : 'Comienza agregando tu primer producto al sistema.'}
+              {productos.length === 0
+                ? 'Comienza agregando tu primer producto al sistema.'
+                : busqueda || proveedorFiltro
+                ? 'Intenta ajustar los filtros de búsqueda o proveedor para encontrar productos.'
+                : 'Este proveedor no tiene productos asociados o no hay productos activos.'}
             </p>
-            {!proveedorFiltro && (
+            {productos.length === 0 && (
               <Link href="/productos/nuevo">
                 <Button size="lg">
                   Crear primer producto
                 </Button>
               </Link>
             )}
-            {proveedorFiltro && (
+            {(busqueda || proveedorFiltro) && productos.length > 0 && (
               <button
-                onClick={() => setProveedorFiltro('')}
+                onClick={() => {
+                  setBusqueda('')
+                  setProveedorFiltro('')
+                }}
                 className="text-sm text-terracotta-600 hover:text-terracotta-700 underline"
               >
                 Ver todos los productos
@@ -238,7 +318,12 @@ export default function ProductosPage() {
                 Listado de Productos
               </h2>
               <div className="text-sm text-neutral-600">
-                {productos.length} {productos.length === 1 ? 'producto' : 'productos'}
+                {productosFiltrados.length} {productosFiltrados.length === 1 ? 'producto' : 'productos'}
+                {productosFiltrados.length !== productos.length && (
+                  <span className="text-neutral-400 ml-2">
+                    (de {productos.length} total)
+                  </span>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -257,7 +342,7 @@ export default function ProductosPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {productos.map((producto) => {
+                {productosFiltrados.map((producto) => {
                   const stockActual = producto.inventario?.stockActual || 0
                   const estado = calcularEstadoInventario(
                     stockActual,
