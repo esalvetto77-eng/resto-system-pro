@@ -211,6 +211,7 @@ export async function PUT(
             if (!prov.proveedorId) continue
             const proveedor = await tx.proveedor.findUnique({
               where: { id: prov.proveedorId },
+              select: { id: true }, // Solo seleccionar el id para evitar errores con columnas que no existen
             })
             if (!proveedor) {
               throw new Error(`Proveedor ${prov.proveedorId} no encontrado`)

@@ -61,6 +61,7 @@ export async function POST(
     // Verificar que el proveedor existe
     const proveedor = await prisma.proveedor.findUnique({
       where: { id: body.proveedorId },
+      select: { id: true }, // Solo seleccionar el id para evitar errores con columnas que no existen
     })
     if (!proveedor) {
       return NextResponse.json(
