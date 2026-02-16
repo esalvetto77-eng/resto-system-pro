@@ -57,20 +57,22 @@ model Producto {
 }
 
 model ProductoProveedor {
-  id               String    @id @default(cuid())
-  productoId       String
-  proveedorId      String
-  precioCompra     Float?    // Precio en la moneda especificada
-  moneda           String?   @default("UYU") // "USD" o "UYU"
-  precioEnDolares  Float?    // Precio en dólares (si moneda es USD)
-  precioEnPesos    Float?    // Precio en pesos uruguayos (calculado)
-  cotizacionUsada Float?    // Cotización del dólar usada para la conversión
-  fechaCotizacion  DateTime? // Fecha de la cotización usada
-  ordenPreferencia Int       @default(1)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  proveedor        Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
-  producto         Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  id                    String    @id @default(cuid())
+  productoId            String
+  proveedorId           String
+  precioCompra          Float?    // Precio en la moneda especificada (precio de la unidad de compra completa)
+  moneda                String?   @default("UYU") // "USD" o "UYU"
+  precioEnDolares       Float?    // Precio en dólares (si moneda es USD)
+  precioEnPesos         Float?    // Precio en pesos uruguayos (calculado)
+  cotizacionUsada       Float?    // Cotización del dólar usada para la conversión
+  fechaCotizacion       DateTime? // Fecha de la cotización usada
+  ordenPreferencia      Int       @default(1)
+  unidadCompra          String?   // Unidad de compra (ej: "bidón", "caja", "paquete")
+  cantidadPorUnidadCompra Float?  // Cantidad en la unidad de compra (ej: 5 litros, 80 bandejas)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  proveedor             Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
+  producto              Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
 
   @@unique([productoId, proveedorId])
   @@index([productoId])

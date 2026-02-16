@@ -28,6 +28,8 @@ interface Producto {
     precioEnDolares: number | null
     precioEnPesos: number | null
     ordenPreferencia: number
+    unidadCompra: string | null
+    cantidadPorUnidadCompra: number | null
     proveedor: { id: string; nombre: string }
   }>
 }

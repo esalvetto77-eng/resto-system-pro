@@ -143,11 +143,13 @@ export async function GET() {
             "precioEnDolares",
             "precioEnPesos",
             "cotizacionUsada",
-            "fechaCotizacion"
+            "fechaCotizacion",
+            "unidadCompra",
+            "cantidadPorUnidadCompra"
           FROM "producto_proveedor"
           WHERE id IN (${idsList})
         `
-        console.log('[API INVENTARIO] Intentando leer campos de moneda para', proveedorIds.length, 'proveedores')
+        console.log('[API INVENTARIO] Intentando leer campos de moneda y presentación para', proveedorIds.length, 'proveedores')
         const result = await prisma.$queryRawUnsafe<Array<{
           id: string
           moneda?: string | null
@@ -155,11 +157,13 @@ export async function GET() {
           precioEnPesos?: number | null
           cotizacionUsada?: number | null
           fechaCotizacion?: Date | null
+          unidadCompra?: string | null
+          cantidadPorUnidadCompra?: number | null
         }>>(query)
         
-        console.log('[API INVENTARIO] Resultados de moneda:', result.length, 'registros encontrados')
+        console.log('[API INVENTARIO] Resultados de moneda y presentación:', result.length, 'registros encontrados')
         
-        // Crear un mapa de ID a datos de moneda
+        // Crear un mapa de ID a datos de moneda y presentación
         result.forEach((row) => {
           monedaData[row.id] = {
             moneda: row.moneda || null,
@@ -167,6 +171,8 @@ export async function GET() {
             precioEnPesos: row.precioEnPesos || null,
             cotizacionUsada: row.cotizacionUsada || null,
             fechaCotizacion: row.fechaCotizacion ? row.fechaCotizacion.toISOString() : null,
+            unidadCompra: row.unidadCompra || null,
+            cantidadPorUnidadCompra: row.cantidadPorUnidadCompra || null,
           }
           console.log('[API INVENTARIO] Moneda para', row.id, ':', row.moneda, 'precioEnDolares:', row.precioEnDolares)
         })
@@ -202,6 +208,9 @@ export async function GET() {
           precioEnPesos: datosMoneda?.precioEnPesos || null,
           cotizacionUsada: datosMoneda?.cotizacionUsada || null,
           fechaCotizacion: datosMoneda?.fechaCotizacion || null,
+          // Campos de presentación
+          unidadCompra: datosMoneda?.unidadCompra || null,
+          cantidadPorUnidadCompra: datosMoneda?.cantidadPorUnidadCompra || null,
         },
       }
       

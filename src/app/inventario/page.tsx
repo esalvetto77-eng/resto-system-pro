@@ -32,6 +32,9 @@ interface InventarioItem {
     precioEnPesos?: number | null
     cotizacionUsada?: number | null
     fechaCotizacion?: string | null
+    // Campos de presentación
+    unidadCompra?: string | null
+    cantidadPorUnidadCompra?: number | null
   }
 }
 
@@ -428,17 +431,49 @@ export default function InventarioPage() {
                       </TableCell>
                       {canEdit() && (
                         <TableCell>
-                          <ProtectedPrice
-                            value={(item as any).precioEnUYU || item.producto.precioCompra}
-                            formatter={formatCurrency}
-                            fallback={<span className="text-neutral-400">-</span>}
-                            className="text-neutral-600"
-                          />
-                          {item.producto.moneda === 'USD' && (
-                            <div className="text-xs text-neutral-500 mt-1">
-                              ({item.producto.precioEnDolares || item.producto.precioCompra} USD)
-                            </div>
-                          )}
+                          {(() => {
+                            const precioCompra = (item as any).precioEnUYU || item.producto.precioCompra
+                            const unidadCompra = item.producto.unidadCompra
+                            const cantidadPorUnidad = item.producto.cantidadPorUnidadCompra
+                            const precioUnitario = precioCompra && cantidadPorUnidad && cantidadPorUnidad > 0
+                              ? precioCompra / cantidadPorUnidad
+                              : null
+                            
+                            return (
+                              <div>
+                                {precioCompra ? (
+                                  <>
+                                    <div className="text-neutral-600">
+                                      <ProtectedPrice
+                                        value={precioCompra}
+                                        formatter={formatCurrency}
+                                        fallback={<span className="text-neutral-400">-</span>}
+                                        className="font-medium"
+                                      />
+                                      {unidadCompra && (
+                                        <span className="text-xs text-neutral-500 ml-1">
+                                          / {unidadCompra}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {precioUnitario && (
+                                      <div className="text-xs text-terracotta-600 mt-1 font-medium">
+                                        {formatCurrency(precioUnitario)} / {item.producto.unidad}
+                                        <span className="text-neutral-500 ml-1">(unitario)</span>
+                                      </div>
+                                    )}
+                                    {item.producto.moneda === 'USD' && (
+                                      <div className="text-xs text-neutral-500 mt-1">
+                                        ({item.producto.precioEnDolares || item.producto.precioCompra} USD)
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="text-neutral-400">-</span>
+                                )}
+                              </div>
+                            )
+                          })()}
                         </TableCell>
                       )}
                       {canEdit() && (

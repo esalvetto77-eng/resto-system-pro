@@ -55,6 +55,8 @@ export async function GET(request: NextRequest) {
             proveedorId: true,
             precioCompra: true,
             ordenPreferencia: true,
+            unidadCompra: true,
+            cantidadPorUnidadCompra: true,
             createdAt: true,
             updatedAt: true,
             proveedor: {
@@ -81,7 +83,7 @@ export async function GET(request: NextRequest) {
     })
     console.log('[API PRODUCTOS] Productos encontrados:', productos.length)
     
-    // Intentar leer campos de moneda usando SQL directo si existen
+    // Intentar leer campos de moneda y presentación usando SQL directo si existen
     const proveedorIds = productos
       .flatMap(p => p.proveedores.map(pp => pp.id))
       .filter((id): id is string => id !== undefined)
@@ -98,7 +100,9 @@ export async function GET(request: NextRequest) {
             "precioEnDolares",
             "precioEnPesos",
             "cotizacionUsada",
-            "fechaCotizacion"
+            "fechaCotizacion",
+            "unidadCompra",
+            "cantidadPorUnidadCompra"
           FROM "producto_proveedor"
           WHERE id IN (${idsList})
         `
@@ -109,9 +113,11 @@ export async function GET(request: NextRequest) {
           precioEnPesos?: number | null
           cotizacionUsada?: number | null
           fechaCotizacion?: Date | null
+          unidadCompra?: string | null
+          cantidadPorUnidadCompra?: number | null
         }>>(query)
         
-        console.log('[API PRODUCTOS] Resultados de moneda:', result.length, 'registros encontrados')
+        console.log('[API PRODUCTOS] Resultados de moneda y presentación:', result.length, 'registros encontrados')
         result.forEach((row) => {
           monedaData[row.id] = {
             moneda: row.moneda || null,
@@ -119,6 +125,8 @@ export async function GET(request: NextRequest) {
             precioEnPesos: row.precioEnPesos || null,
             cotizacionUsada: row.cotizacionUsada || null,
             fechaCotizacion: row.fechaCotizacion ? row.fechaCotizacion.toISOString() : null,
+            unidadCompra: row.unidadCompra || null,
+            cantidadPorUnidadCompra: row.cantidadPorUnidadCompra || null,
           }
           if (row.moneda === 'USD' || row.precioEnDolares) {
             console.log('[API PRODUCTOS] Producto en USD encontrado:', row.id, {
@@ -131,15 +139,15 @@ export async function GET(request: NextRequest) {
       } catch (error: any) {
         // Si los campos no existen, es normal - el usuario necesita ejecutar npx prisma db push
         if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
-          console.log('[API PRODUCTOS] Campos de moneda no existen en BD. Ejecuta: npx prisma db push')
+          console.log('[API PRODUCTOS] Campos de moneda/presentación no existen en BD. Ejecuta: npx prisma db push')
         } else {
-          console.log('[API PRODUCTOS] Error al leer campos de moneda:', error?.message)
+          console.log('[API PRODUCTOS] Error al leer campos de moneda/presentación:', error?.message)
           console.log('[API PRODUCTOS] Error completo:', error)
         }
       }
     }
     
-    // Agregar información de moneda a cada proveedor
+    // Agregar información de moneda y presentación a cada proveedor
     const productosConMoneda = productos.map(producto => ({
       ...producto,
       proveedores: producto.proveedores.map(pp => {
@@ -159,6 +167,8 @@ export async function GET(request: NextRequest) {
           precioEnPesos: datosMoneda.precioEnPesos || null,
           cotizacionUsada: datosMoneda.cotizacionUsada || null,
           fechaCotizacion: datosMoneda.fechaCotizacion || null,
+          unidadCompra: datosMoneda.unidadCompra || null,
+          cantidadPorUnidadCompra: datosMoneda.cantidadPorUnidadCompra || null,
         }
       }),
     }))
@@ -219,8 +229,9 @@ export async function POST(request: NextRequest) {
       return null
     }
 
-    // Verificar si los campos de moneda existen ANTES de la transacción
+    // Verificar si los campos de moneda y presentación existen ANTES de la transacción
     let camposMonedaExisten = false
+    let camposPresentacionExisten = false
     try {
       // Intentar una consulta simple para verificar si los campos existen
       await prisma.$queryRawUnsafe(`SELECT "moneda" FROM "producto_proveedor" LIMIT 1`)
@@ -231,9 +242,21 @@ export async function POST(request: NextRequest) {
         console.log('[API PRODUCTOS POST] Campos de moneda NO existen en BD, usando solo campos básicos')
         camposMonedaExisten = false
       } else {
-        // Si es otro error, asumir que los campos no existen por seguridad
         console.log('[API PRODUCTOS POST] No se pudo verificar campos de moneda, usando solo campos básicos')
         camposMonedaExisten = false
+      }
+    }
+    
+    try {
+      await prisma.$queryRawUnsafe(`SELECT "unidadCompra" FROM "producto_proveedor" LIMIT 1`)
+      camposPresentacionExisten = true
+      console.log('[API PRODUCTOS POST] Campos de presentación existen en BD')
+    } catch (error: any) {
+      if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
+        console.log('[API PRODUCTOS POST] Campos de presentación NO existen en BD')
+        camposPresentacionExisten = false
+      } else {
+        camposPresentacionExisten = false
       }
     }
     
@@ -315,13 +338,51 @@ export async function POST(request: NextRequest) {
               precioEnPesos,
               cotizacionUsada: moneda === 'USD' ? cotizacionActual : null,
               fechaCotizacion: moneda === 'USD' && cotizacionActual ? new Date() : null,
+              unidadCompra: toStringOrNull(prov.unidadCompra),
+              cantidadPorUnidadCompra: toNumberOrNull(prov.cantidadPorUnidadCompra),
             }
           })
         
         // Insertar proveedores según si los campos existen o no (verificado antes de la transacción)
         for (const datosProv of proveedoresParaCrear) {
-          if (camposMonedaExisten) {
-            // Insertar con campos de moneda
+          if (camposMonedaExisten && camposPresentacionExisten) {
+            // Insertar con todos los campos
+            await tx.$executeRawUnsafe(`
+              INSERT INTO producto_proveedor (
+                id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
+                "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
+                "unidadCompra", "cantidadPorUnidadCompra",
+                "createdAt", "updatedAt"
+              )
+              VALUES (
+                gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW()
+              )
+              ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
+                "precioCompra" = EXCLUDED."precioCompra",
+                "ordenPreferencia" = EXCLUDED."ordenPreferencia",
+                "moneda" = EXCLUDED."moneda",
+                "precioEnDolares" = EXCLUDED."precioEnDolares",
+                "precioEnPesos" = EXCLUDED."precioEnPesos",
+                "cotizacionUsada" = EXCLUDED."cotizacionUsada",
+                "fechaCotizacion" = EXCLUDED."fechaCotizacion",
+                "unidadCompra" = EXCLUDED."unidadCompra",
+                "cantidadPorUnidadCompra" = EXCLUDED."cantidadPorUnidadCompra",
+                "updatedAt" = NOW()
+            `,
+              datosProv.productoId,
+              datosProv.proveedorId,
+              datosProv.precioCompra,
+              datosProv.ordenPreferencia,
+              datosProv.moneda,
+              datosProv.precioEnDolares,
+              datosProv.precioEnPesos,
+              datosProv.cotizacionUsada,
+              datosProv.fechaCotizacion,
+              datosProv.unidadCompra,
+              datosProv.cantidadPorUnidadCompra
+            )
+          } else if (camposMonedaExisten) {
+            // Insertar con campos de moneda pero sin presentación
             await tx.$executeRawUnsafe(`
               INSERT INTO producto_proveedor (
                 id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",

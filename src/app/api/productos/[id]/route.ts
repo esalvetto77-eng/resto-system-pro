@@ -72,19 +72,63 @@ export async function GET(
 
     console.log('[API PRODUCTO] Producto encontrado:', producto.id, producto.nombre)
 
+    // Leer campos adicionales (moneda y presentación) usando SQL directo
+    const proveedorIds = producto.proveedores.map(pp => pp.id).filter((id): id is string => id !== undefined)
+    let camposAdicionales: Record<string, any> = {}
+    
+    if (proveedorIds.length > 0) {
+      try {
+        const idsList = proveedorIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',')
+        const query = `
+          SELECT 
+            id,
+            "moneda",
+            "precioEnDolares",
+            "precioEnPesos",
+            "cotizacionUsada",
+            "fechaCotizacion",
+            "unidadCompra",
+            "cantidadPorUnidadCompra"
+          FROM "producto_proveedor"
+          WHERE id IN (${idsList})
+        `
+        const result = await prisma.$queryRawUnsafe<Array<{
+          id: string
+          moneda?: string | null
+          precioEnDolares?: number | null
+          precioEnPesos?: number | null
+          cotizacionUsada?: number | null
+          fechaCotizacion?: Date | null
+          unidadCompra?: string | null
+          cantidadPorUnidadCompra?: number | null
+        }>>(query)
+        
+        result.forEach((row) => {
+          camposAdicionales[row.id] = {
+            moneda: row.moneda || null,
+            precioEnDolares: row.precioEnDolares || null,
+            precioEnPesos: row.precioEnPesos || null,
+            cotizacionUsada: row.cotizacionUsada || null,
+            fechaCotizacion: row.fechaCotizacion ? row.fechaCotizacion.toISOString() : null,
+            unidadCompra: row.unidadCompra || null,
+            cantidadPorUnidadCompra: row.cantidadPorUnidadCompra || null,
+          }
+        })
+      } catch (error: any) {
+        console.log('[API PRODUCTO GET] Error al leer campos adicionales:', error?.message)
+      }
+    }
+    
     // Asegurar que los campos nuevos tengan valores por defecto si son null (para productos antiguos)
-    // Usar hasOwnProperty para verificar si los campos existen antes de acceder
     const productoConDefaults = {
       ...producto,
       proveedores: producto.proveedores.map((pp: any) => {
-        // Verificar si los campos nuevos existen, si no, usar valores por defecto
-        const moneda = pp.hasOwnProperty('moneda') ? (pp.moneda || 'UYU') : 'UYU'
-        const precioEnDolares = pp.hasOwnProperty('precioEnDolares') ? (pp.precioEnDolares ?? null) : null
-        const precioEnPesos = pp.hasOwnProperty('precioEnPesos') 
-          ? (pp.precioEnPesos ?? (moneda === 'UYU' ? pp.precioCompra : null))
-          : (moneda === 'UYU' ? pp.precioCompra : null)
-        const cotizacionUsada = pp.hasOwnProperty('cotizacionUsada') ? (pp.cotizacionUsada ?? null) : null
-        const fechaCotizacion = pp.hasOwnProperty('fechaCotizacion') ? (pp.fechaCotizacion ?? null) : null
+        const campos = camposAdicionales[pp.id] || {}
+        const moneda = campos.moneda || 'UYU'
+        const precioEnDolares = campos.precioEnDolares ?? null
+        const precioEnPesos = campos.precioEnPesos ?? (moneda === 'UYU' ? pp.precioCompra : null)
+        const cotizacionUsada = campos.cotizacionUsada ?? null
+        const fechaCotizacion = campos.fechaCotizacion ?? null
         
         return {
           ...pp,
@@ -93,6 +137,8 @@ export async function GET(
           precioEnPesos,
           cotizacionUsada,
           fechaCotizacion,
+          unidadCompra: campos.unidadCompra || null,
+          cantidadPorUnidadCompra: campos.cantidadPorUnidadCompra || null,
         }
       }),
     }
@@ -160,8 +206,9 @@ export async function PUT(
     console.log('[API PRODUCTO PUT] Iniciando actualización de producto:', params.id)
     console.log('[API PRODUCTO PUT] Body recibido:', JSON.stringify(body, null, 2))
     
-    // Verificar si los campos de moneda existen ANTES de la transacción
+    // Verificar si los campos de moneda y presentación existen ANTES de la transacción
     let camposMonedaExisten = false
+    let camposPresentacionExisten = false
     try {
       // Intentar una consulta simple para verificar si los campos existen
       await prisma.$queryRawUnsafe(`SELECT "moneda" FROM "producto_proveedor" LIMIT 1`)
@@ -172,9 +219,21 @@ export async function PUT(
         console.log('[API PRODUCTO PUT] Campos de moneda NO existen en BD, usando solo campos básicos')
         camposMonedaExisten = false
       } else {
-        // Si es otro error, asumir que los campos no existen por seguridad
         console.log('[API PRODUCTO PUT] No se pudo verificar campos de moneda, usando solo campos básicos')
         camposMonedaExisten = false
+      }
+    }
+    
+    try {
+      await prisma.$queryRawUnsafe(`SELECT "unidadCompra" FROM "producto_proveedor" LIMIT 1`)
+      camposPresentacionExisten = true
+      console.log('[API PRODUCTO PUT] Campos de presentación existen en BD')
+    } catch (error: any) {
+      if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
+        console.log('[API PRODUCTO PUT] Campos de presentación NO existen en BD')
+        camposPresentacionExisten = false
+      } else {
+        camposPresentacionExisten = false
       }
     }
     
@@ -234,7 +293,7 @@ export async function PUT(
             }
           }
           
-          // Crear datos con campos de moneda
+          // Crear datos con campos de moneda y presentación
           const datosProveedores = body.proveedores
             .filter((prov: any) => prov.proveedorId)
             .map((prov: any, index: number) => {
@@ -260,6 +319,8 @@ export async function PUT(
                 precioEnPesos,
                 cotizacionUsada: moneda === 'USD' ? cotizacionActual : null,
                 fechaCotizacion: moneda === 'USD' && cotizacionActual ? new Date() : null,
+                unidadCompra: toStringOrNull(prov.unidadCompra),
+                cantidadPorUnidadCompra: toNumberOrNull(prov.cantidadPorUnidadCompra),
               }
             })
           
@@ -267,8 +328,44 @@ export async function PUT(
           
           // Insertar proveedores según si los campos existen o no (verificado antes de la transacción)
           for (const datosProv of datosProveedores) {
-            if (camposMonedaExisten) {
-              // Insertar con campos de moneda
+            if (camposMonedaExisten && camposPresentacionExisten) {
+              // Insertar con todos los campos
+              await tx.$executeRawUnsafe(`
+                INSERT INTO producto_proveedor (
+                  id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
+                  "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
+                  "unidadCompra", "cantidadPorUnidadCompra",
+                  "createdAt", "updatedAt"
+                )
+                VALUES (
+                  gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW()
+                )
+                ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
+                  "precioCompra" = EXCLUDED."precioCompra",
+                  "ordenPreferencia" = EXCLUDED."ordenPreferencia",
+                  "moneda" = EXCLUDED."moneda",
+                  "precioEnDolares" = EXCLUDED."precioEnDolares",
+                  "precioEnPesos" = EXCLUDED."precioEnPesos",
+                  "cotizacionUsada" = EXCLUDED."cotizacionUsada",
+                  "fechaCotizacion" = EXCLUDED."fechaCotizacion",
+                  "unidadCompra" = EXCLUDED."unidadCompra",
+                  "cantidadPorUnidadCompra" = EXCLUDED."cantidadPorUnidadCompra",
+                  "updatedAt" = NOW()
+              `,
+                datosProv.productoId,
+                datosProv.proveedorId,
+                datosProv.precioCompra,
+                datosProv.ordenPreferencia,
+                datosProv.moneda,
+                datosProv.precioEnDolares,
+                datosProv.precioEnPesos,
+                datosProv.cotizacionUsada,
+                datosProv.fechaCotizacion,
+                datosProv.unidadCompra,
+                datosProv.cantidadPorUnidadCompra
+              )
+            } else if (camposMonedaExisten) {
+              // Insertar con campos de moneda pero sin presentación
               await tx.$executeRawUnsafe(`
                 INSERT INTO producto_proveedor (
                   id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
