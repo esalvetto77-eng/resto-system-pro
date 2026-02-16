@@ -55,8 +55,6 @@ export async function GET(request: NextRequest) {
             proveedorId: true,
             precioCompra: true,
             ordenPreferencia: true,
-            unidadCompra: true,
-            cantidadPorUnidadCompra: true,
             createdAt: true,
             updatedAt: true,
             proveedor: {

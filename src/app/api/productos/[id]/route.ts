@@ -222,9 +222,10 @@ export async function PUT(
     console.log('[API PRODUCTO PUT] Iniciando actualización de producto:', params.id)
     console.log('[API PRODUCTO PUT] Body recibido:', JSON.stringify(body, null, 2))
     
-    // Verificar si los campos de moneda y presentación existen ANTES de la transacción
+    // Verificar si los campos de moneda, presentación e IVA existen ANTES de la transacción
     let camposMonedaExisten = false
     let camposPresentacionExisten = false
+    let camposIVAExisten = false
     try {
       // Intentar una consulta simple para verificar si los campos existen
       await prisma.$queryRawUnsafe(`SELECT "moneda" FROM "producto_proveedor" LIMIT 1`)
