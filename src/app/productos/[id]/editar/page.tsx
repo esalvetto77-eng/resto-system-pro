@@ -576,21 +576,44 @@ export default function EditarProductoPage({
                         }
                       />
                     </div>
-                    {precioUnitario && (
-                      <div className="md:col-span-2 lg:col-span-3">
-                        <div className="bg-neutral-50 p-3 rounded-md border border-neutral-200">
-                          <div className="text-sm font-medium text-neutral-700 mb-1">
-                            Precio Unitario Calculado:
-                          </div>
-                          <div className="text-lg font-semibold text-terracotta-700">
-                            {formatCurrency(precioUnitario)} {prov.moneda} / {formData.unidad}
-                          </div>
-                          <div className="text-xs text-neutral-500 mt-1">
-                            {prov.precioCompra} {prov.moneda} ÷ {prov.cantidadPorUnidadCompra} {formData.unidad} = {precioUnitario.toFixed(2)} {prov.moneda} / {formData.unidad}
+                    {precioUnitario && prov.cantidadPorUnidadCompra && (() => {
+                      const { precioSinIVA, precioConIVA } = obtenerPreciosIVA(prov)
+                      const precioUnitarioSinIVA = precioSinIVA ? precioSinIVA / prov.cantidadPorUnidadCompra : null
+                      const precioUnitarioConIVA = precioConIVA ? precioConIVA / prov.cantidadPorUnidadCompra : null
+                      return (
+                        <div className="md:col-span-2 lg:col-span-3">
+                          <div className="bg-neutral-50 p-3 rounded-md border border-neutral-200">
+                            <div className="text-sm font-medium text-neutral-700 mb-2">
+                              Precio Unitario Calculado:
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <div className="text-xs text-neutral-600 mb-1">Precio Unitario Sin IVA:</div>
+                                <div className="text-base font-semibold text-terracotta-700">
+                                  {precioUnitarioSinIVA ? formatCurrency(precioUnitarioSinIVA) : '-'} {prov.moneda} / {formData.unidad}
+                                </div>
+                                {precioSinIVA && (
+                                  <div className="text-xs text-neutral-500 mt-1">
+                                    {precioSinIVA.toFixed(2)} {prov.moneda} ÷ {prov.cantidadPorUnidadCompra} {formData.unidad} = {precioUnitarioSinIVA?.toFixed(2)} {prov.moneda} / {formData.unidad}
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <div className="text-xs text-neutral-600 mb-1">Precio Unitario Con IVA ({prov.tipoIVA}%):</div>
+                                <div className="text-base font-semibold text-terracotta-700">
+                                  {precioUnitarioConIVA ? formatCurrency(precioUnitarioConIVA) : '-'} {prov.moneda} / {formData.unidad}
+                                </div>
+                                {precioConIVA && (
+                                  <div className="text-xs text-neutral-500 mt-1">
+                                    {precioConIVA.toFixed(2)} {prov.moneda} ÷ {prov.cantidadPorUnidadCompra} {formData.unidad} = {precioUnitarioConIVA?.toFixed(2)} {prov.moneda} / {formData.unidad}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )
+                    })()}
                     <div className="md:col-span-2 lg:col-span-3 flex items-end justify-end">
                       {proveedoresProducto.length > 1 && (
                         <button
