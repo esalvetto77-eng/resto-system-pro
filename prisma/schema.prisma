@@ -69,6 +69,10 @@ model ProductoProveedor {
   ordenPreferencia      Int       @default(1)
   unidadCompra          String?   // Unidad de compra (ej: "bidón", "caja", "paquete")
   cantidadPorUnidadCompra Float?  // Cantidad en la unidad de compra (ej: 5 litros, 80 bandejas)
+  tipoIVA               String?   // Tipo de IVA: "0", "10", "22" (porcentaje)
+  precioIngresadoConIVA Boolean?  @default(false) // true si precioCompra incluye IVA, false si no
+  precioConIVA          Float?    // Precio con IVA calculado
+  precioSinIVA          Float?    // Precio sin IVA calculado
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
   proveedor             Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)

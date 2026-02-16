@@ -30,6 +30,10 @@ interface Producto {
     ordenPreferencia: number
     unidadCompra: string | null
     cantidadPorUnidadCompra: number | null
+    tipoIVA: string | null
+    precioIngresadoConIVA: boolean | null
+    precioConIVA: number | null
+    precioSinIVA: number | null
     proveedor: { id: string; nombre: string }
   }>
 }
@@ -414,7 +418,7 @@ export default function ProductosPage() {
                       {canSeePrices() && (
                         <TableCell>
                           {producto.proveedores.length > 0 ? (
-                            <div className="space-y-1">
+                            <div className="space-y-2">
                               {producto.proveedores
                                 .filter(pp => pp.precioCompra !== null)
                                 .sort((a, b) => {
@@ -427,9 +431,12 @@ export default function ProductosPage() {
                                   const precioEnPesos = pp.precioEnPesos || (pp.moneda === 'UYU' ? pp.precioCompra : null)
                                   const isCheapest = idx === 0 && producto.proveedores.filter(p => p.precioCompra !== null).length > 1
                                   const moneda = pp.moneda || 'UYU'
+                                  const precioConIVA = pp.precioConIVA || null
+                                  const precioSinIVA = pp.precioSinIVA || null
+                                  const tipoIVA = pp.tipoIVA || null
                                   
                                   return (
-                                    <div key={pp.id} className="text-sm">
+                                    <div key={pp.id} className="text-sm border-b border-neutral-100 pb-2 last:border-0 last:pb-0">
                                       <div className="flex items-center gap-2">
                                         <div className={isCheapest ? 'font-medium text-terracotta-700' : 'text-neutral-600'}>
                                           {moneda === 'USD' ? (
@@ -461,6 +468,18 @@ export default function ProductosPage() {
                                           <span className="text-xs text-terracotta-600">↓</span>
                                         )}
                                       </div>
+                                      {tipoIVA && tipoIVA !== '0' && (precioConIVA || precioSinIVA) && (
+                                        <div className="mt-1 text-xs text-neutral-500 space-y-0.5">
+                                          {precioSinIVA && (
+                                            <div>Sin IVA: {formatCurrency(precioSinIVA)} {moneda}</div>
+                                          )}
+                                          {precioConIVA && (
+                                            <div className="font-medium text-neutral-700">
+                                              Con IVA ({tipoIVA}%): {formatCurrency(precioConIVA)} {moneda}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                   )
                                 })}

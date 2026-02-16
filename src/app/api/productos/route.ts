@@ -102,7 +102,11 @@ export async function GET(request: NextRequest) {
             "cotizacionUsada",
             "fechaCotizacion",
             "unidadCompra",
-            "cantidadPorUnidadCompra"
+            "cantidadPorUnidadCompra",
+            "tipoIVA",
+            "precioIngresadoConIVA",
+            "precioConIVA",
+            "precioSinIVA"
           FROM "producto_proveedor"
           WHERE id IN (${idsList})
         `
@@ -115,9 +119,13 @@ export async function GET(request: NextRequest) {
           fechaCotizacion?: Date | null
           unidadCompra?: string | null
           cantidadPorUnidadCompra?: number | null
+          tipoIVA?: string | null
+          precioIngresadoConIVA?: boolean | null
+          precioConIVA?: number | null
+          precioSinIVA?: number | null
         }>>(query)
         
-        console.log('[API PRODUCTOS] Resultados de moneda y presentación:', result.length, 'registros encontrados')
+        console.log('[API PRODUCTOS] Resultados de moneda, presentación e IVA:', result.length, 'registros encontrados')
         result.forEach((row) => {
           monedaData[row.id] = {
             moneda: row.moneda || null,
@@ -127,6 +135,10 @@ export async function GET(request: NextRequest) {
             fechaCotizacion: row.fechaCotizacion ? row.fechaCotizacion.toISOString() : null,
             unidadCompra: row.unidadCompra || null,
             cantidadPorUnidadCompra: row.cantidadPorUnidadCompra || null,
+            tipoIVA: row.tipoIVA || null,
+            precioIngresadoConIVA: row.precioIngresadoConIVA || false,
+            precioConIVA: row.precioConIVA || null,
+            precioSinIVA: row.precioSinIVA || null,
           }
           if (row.moneda === 'USD' || row.precioEnDolares) {
             console.log('[API PRODUCTOS] Producto en USD encontrado:', row.id, {
@@ -169,6 +181,10 @@ export async function GET(request: NextRequest) {
           fechaCotizacion: datosMoneda.fechaCotizacion || null,
           unidadCompra: datosMoneda.unidadCompra || null,
           cantidadPorUnidadCompra: datosMoneda.cantidadPorUnidadCompra || null,
+          tipoIVA: datosMoneda.tipoIVA || null,
+          precioIngresadoConIVA: datosMoneda.precioIngresadoConIVA || false,
+          precioConIVA: datosMoneda.precioConIVA || null,
+          precioSinIVA: datosMoneda.precioSinIVA || null,
         }
       }),
     }))
@@ -229,9 +245,10 @@ export async function POST(request: NextRequest) {
       return null
     }
 
-    // Verificar si los campos de moneda y presentación existen ANTES de la transacción
+    // Verificar si los campos de moneda, presentación e IVA existen ANTES de la transacción
     let camposMonedaExisten = false
     let camposPresentacionExisten = false
+    let camposIVAExisten = false
     try {
       // Intentar una consulta simple para verificar si los campos existen
       await prisma.$queryRawUnsafe(`SELECT "moneda" FROM "producto_proveedor" LIMIT 1`)
@@ -257,6 +274,19 @@ export async function POST(request: NextRequest) {
         camposPresentacionExisten = false
       } else {
         camposPresentacionExisten = false
+      }
+    }
+    
+    try {
+      await prisma.$queryRawUnsafe(`SELECT "tipoIVA" FROM "producto_proveedor" LIMIT 1`)
+      camposIVAExisten = true
+      console.log('[API PRODUCTOS POST] Campos de IVA existen en BD')
+    } catch (error: any) {
+      if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
+        console.log('[API PRODUCTOS POST] Campos de IVA NO existen en BD')
+        camposIVAExisten = false
+      } else {
+        camposIVAExisten = false
       }
     }
     
@@ -340,13 +370,76 @@ export async function POST(request: NextRequest) {
               fechaCotizacion: moneda === 'USD' && cotizacionActual ? new Date() : null,
               unidadCompra: toStringOrNull(prov.unidadCompra),
               cantidadPorUnidadCompra: toNumberOrNull(prov.cantidadPorUnidadCompra),
+              tipoIVA: toStringOrNull(prov.tipoIVA),
+              precioIngresadoConIVA: prov.precioIngresadoConIVA !== undefined ? Boolean(prov.precioIngresadoConIVA) : false,
             }
           })
+          
+          // Calcular precios con/sin IVA para cada proveedor
+          for (const datosProv of proveedoresParaCrear) {
+            if (datosProv.precioCompra && datosProv.tipoIVA) {
+              const ivaDecimal = parseFloat(datosProv.tipoIVA) / 100
+              if (datosProv.precioIngresadoConIVA) {
+                // Precio ingresado incluye IVA
+                datosProv.precioSinIVA = datosProv.precioCompra / (1 + ivaDecimal)
+                datosProv.precioConIVA = datosProv.precioCompra
+              } else {
+                // Precio ingresado sin IVA
+                datosProv.precioSinIVA = datosProv.precioCompra
+                datosProv.precioConIVA = datosProv.precioCompra * (1 + ivaDecimal)
+              }
+            }
+          }
         
         // Insertar proveedores según si los campos existen o no (verificado antes de la transacción)
         for (const datosProv of proveedoresParaCrear) {
-          if (camposMonedaExisten && camposPresentacionExisten) {
-            // Insertar con todos los campos
+          if (camposMonedaExisten && camposPresentacionExisten && camposIVAExisten) {
+            // Insertar con todos los campos incluyendo IVA
+            await tx.$executeRawUnsafe(`
+              INSERT INTO producto_proveedor (
+                id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
+                "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
+                "unidadCompra", "cantidadPorUnidadCompra",
+                "tipoIVA", "precioIngresadoConIVA", "precioConIVA", "precioSinIVA",
+                "createdAt", "updatedAt"
+              )
+              VALUES (
+                gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW()
+              )
+              ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
+                "precioCompra" = EXCLUDED."precioCompra",
+                "ordenPreferencia" = EXCLUDED."ordenPreferencia",
+                "moneda" = EXCLUDED."moneda",
+                "precioEnDolares" = EXCLUDED."precioEnDolares",
+                "precioEnPesos" = EXCLUDED."precioEnPesos",
+                "cotizacionUsada" = EXCLUDED."cotizacionUsada",
+                "fechaCotizacion" = EXCLUDED."fechaCotizacion",
+                "unidadCompra" = EXCLUDED."unidadCompra",
+                "cantidadPorUnidadCompra" = EXCLUDED."cantidadPorUnidadCompra",
+                "tipoIVA" = EXCLUDED."tipoIVA",
+                "precioIngresadoConIVA" = EXCLUDED."precioIngresadoConIVA",
+                "precioConIVA" = EXCLUDED."precioConIVA",
+                "precioSinIVA" = EXCLUDED."precioSinIVA",
+                "updatedAt" = NOW()
+            `,
+              datosProv.productoId,
+              datosProv.proveedorId,
+              datosProv.precioCompra,
+              datosProv.ordenPreferencia,
+              datosProv.moneda,
+              datosProv.precioEnDolares,
+              datosProv.precioEnPesos,
+              datosProv.cotizacionUsada,
+              datosProv.fechaCotizacion,
+              datosProv.unidadCompra,
+              datosProv.cantidadPorUnidadCompra,
+              datosProv.tipoIVA,
+              datosProv.precioIngresadoConIVA,
+              datosProv.precioConIVA,
+              datosProv.precioSinIVA
+            )
+          } else if (camposMonedaExisten && camposPresentacionExisten) {
+            // Insertar con campos de moneda y presentación pero sin IVA
             await tx.$executeRawUnsafe(`
               INSERT INTO producto_proveedor (
                 id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",

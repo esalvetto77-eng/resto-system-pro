@@ -53,8 +53,10 @@ export default function NuevoProductoPage() {
       ordenPreferencia: number
       unidadCompra: string
       cantidadPorUnidadCompra: number | null
+      tipoIVA: string
+      precioIngresadoConIVA: boolean
     }>
-  >([{ proveedorId: '', precioCompra: null, moneda: 'UYU', ordenPreferencia: 1, unidadCompra: '', cantidadPorUnidadCompra: null }])
+  >([{ proveedorId: '', precioCompra: null, moneda: 'UYU', ordenPreferencia: 1, unidadCompra: '', cantidadPorUnidadCompra: null, tipoIVA: '22', precioIngresadoConIVA: false }])
 
   useEffect(() => {
     async function fetchProveedores() {
@@ -95,6 +97,8 @@ export default function NuevoProductoPage() {
         ordenPreferencia: proveedoresProducto.length + 1,
         unidadCompra: '',
         cantidadPorUnidadCompra: null,
+        tipoIVA: '22',
+        precioIngresadoConIVA: false,
       },
     ])
   }
@@ -110,12 +114,14 @@ export default function NuevoProductoPage() {
 
   const updateProveedor = (
     index: number,
-    field: 'proveedorId' | 'precioCompra' | 'moneda' | 'ordenPreferencia' | 'unidadCompra' | 'cantidadPorUnidadCompra',
-    value: string | number | null
+    field: 'proveedorId' | 'precioCompra' | 'moneda' | 'ordenPreferencia' | 'unidadCompra' | 'cantidadPorUnidadCompra' | 'tipoIVA' | 'precioIngresadoConIVA',
+    value: string | number | null | boolean
   ) => {
     const nuevos = [...proveedoresProducto]
     if (field === 'precioCompra') {
       nuevos[index].precioCompra = value === '' ? null : Number(value)
+      // Recalcular IVA cuando cambia el precio
+      recalcularIVA(nuevos, index)
     } else if (field === 'ordenPreferencia') {
       nuevos[index].ordenPreferencia = Number(value)
     } else if (field === 'cantidadPorUnidadCompra') {
@@ -124,10 +130,50 @@ export default function NuevoProductoPage() {
       nuevos[index].moneda = value as 'USD' | 'UYU'
     } else if (field === 'unidadCompra') {
       nuevos[index].unidadCompra = value as string
+    } else if (field === 'tipoIVA') {
+      nuevos[index].tipoIVA = value as string
+      // Recalcular IVA cuando cambia el tipo
+      recalcularIVA(nuevos, index)
+    } else if (field === 'precioIngresadoConIVA') {
+      nuevos[index].precioIngresadoConIVA = value as boolean
+      // Recalcular IVA cuando cambia la opción
+      recalcularIVA(nuevos, index)
     } else {
       nuevos[index].proveedorId = value as string
     }
     setProveedoresProducto(nuevos)
+  }
+
+  // Calcular precios con/sin IVA (no modifica precioCompra, solo recalcula para mostrar)
+  const recalcularIVA = (proveedores: typeof proveedoresProducto, index: number) => {
+    // Esta función se llama cuando cambian los campos de IVA
+    // No necesitamos modificar nada aquí, solo recalcular para mostrar
+    // Los cálculos se hacen en obtenerPreciosIVA
+  }
+
+  // Obtener precios calculados
+  const obtenerPreciosIVA = (prov: typeof proveedoresProducto[0]) => {
+    if (!prov.precioCompra || prov.precioCompra === 0 || !prov.tipoIVA) {
+      return { precioSinIVA: null, precioConIVA: null }
+    }
+
+    const ivaDecimal = parseFloat(prov.tipoIVA) / 100
+    let precioSinIVA: number
+    let precioConIVA: number
+
+    if (prov.precioIngresadoConIVA) {
+      // Si ingresó con IVA, el precioCompra incluye IVA
+      // Calcular precio sin IVA
+      precioSinIVA = prov.precioCompra / (1 + ivaDecimal)
+      precioConIVA = prov.precioCompra
+    } else {
+      // Si ingresó sin IVA, el precioCompra es sin IVA
+      // Calcular precio con IVA
+      precioSinIVA = prov.precioCompra
+      precioConIVA = prov.precioCompra * (1 + ivaDecimal)
+    }
+
+    return { precioSinIVA, precioConIVA }
   }
 
   // Calcular precio unitario
@@ -354,6 +400,59 @@ export default function NuevoProductoPage() {
                         </div>
                       )}
                     </div>
+                    <div>
+                      <label className="label">Tipo de IVA</label>
+                      <select
+                        className="input"
+                        value={prov.tipoIVA}
+                        onChange={(e) =>
+                          updateProveedor(index, 'tipoIVA', e.target.value)
+                        }
+                      >
+                        <option value="0">IVA 0%</option>
+                        <option value="10">IVA 10%</option>
+                        <option value="22">IVA 22%</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">El precio ingresado:</label>
+                      <select
+                        className="input"
+                        value={prov.precioIngresadoConIVA ? 'con' : 'sin'}
+                        onChange={(e) =>
+                          updateProveedor(index, 'precioIngresadoConIVA', e.target.value === 'con')
+                        }
+                      >
+                        <option value="sin">Sin IVA</option>
+                        <option value="con">Con IVA</option>
+                      </select>
+                    </div>
+                    {prov.precioCompra && prov.tipoIVA && (() => {
+                      const { precioSinIVA, precioConIVA } = obtenerPreciosIVA(prov)
+                      return (
+                        <div className="md:col-span-2 lg:col-span-3">
+                          <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
+                            <div className="text-sm font-medium text-blue-700 mb-2">
+                              Precios Calculados:
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <div className="text-xs text-blue-600 mb-1">Precio Sin IVA:</div>
+                                <div className="text-base font-semibold text-blue-900">
+                                  {formatCurrency(precioSinIVA)} {prov.moneda}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-blue-600 mb-1">Precio Con IVA ({prov.tipoIVA}%):</div>
+                                <div className="text-base font-semibold text-blue-900">
+                                  {formatCurrency(precioConIVA)} {prov.moneda}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
                     <div>
                       <label className="label">Unidad de Compra</label>
                       <input
