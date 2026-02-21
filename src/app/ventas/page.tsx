@@ -68,6 +68,7 @@ export default function VentasPage() {
   const [loading, setLoading] = useState(false)
   const [restauranteFiltro, setRestauranteFiltro] = useState<string>('')
   const [canalVentaFiltro, setCanalVentaFiltro] = useState<string>('')
+  const [tipoTurnoFiltro, setTipoTurnoFiltro] = useState<string>('')
   const [mounted, setMounted] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [addingCanalVenta, setAddingCanalVenta] = useState(false)
@@ -90,7 +91,7 @@ export default function VentasPage() {
       fetchVentas()
       fetchStats()
     }
-  }, [mounted, isAdmin, restauranteFiltro, canalVentaFiltro, authLoading])
+  }, [mounted, isAdmin, restauranteFiltro, canalVentaFiltro, tipoTurnoFiltro, authLoading])
 
   async function fetchVentas() {
     try {
@@ -101,6 +102,9 @@ export default function VentasPage() {
       }
       if (canalVentaFiltro) {
         params.append('canalVenta', canalVentaFiltro)
+      }
+      if (tipoTurnoFiltro) {
+        params.append('tipoTurno', tipoTurnoFiltro)
       }
       const queryString = params.toString()
       const url = queryString ? `/api/ventas?${queryString}` : '/api/ventas'
@@ -436,6 +440,20 @@ export default function VentasPage() {
                 <option value="Poked">Poked</option>
                 <option value="Rainbowl">Rainbowl</option>
                 <option value="Volar">Volar</option>
+              </select>
+            </div>
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-neutral-700" style={{ fontWeight: 500 }}>
+                Turno:
+              </label>
+              <select
+                className="px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-terracotta-500 focus:border-transparent"
+                value={tipoTurnoFiltro}
+                onChange={(e) => setTipoTurnoFiltro(e.target.value)}
+              >
+                <option value="">Todos</option>
+                <option value="DAY">Día</option>
+                <option value="NIGHT">Noche</option>
               </select>
             </div>
           </div>
