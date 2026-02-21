@@ -159,9 +159,18 @@ export default function VentasPage() {
 
   async function fetchStats() {
     try {
-      const url = restauranteFiltro
-        ? `/api/ventas/stats?restauranteId=${restauranteFiltro}`
-        : '/api/ventas/stats'
+      const params = new URLSearchParams()
+      if (restauranteFiltro) {
+        params.append('restauranteId', restauranteFiltro)
+      }
+      if (canalVentaFiltro) {
+        params.append('canalVenta', canalVentaFiltro)
+      }
+      if (tipoTurnoFiltro) {
+        params.append('tipoTurno', tipoTurnoFiltro)
+      }
+      const queryString = params.toString()
+      const url = queryString ? `/api/ventas/stats?${queryString}` : '/api/ventas/stats'
       
       // Agregar opciones para evitar problemas de caché y red
       const response = await fetch(url, {

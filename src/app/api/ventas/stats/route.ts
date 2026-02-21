@@ -31,6 +31,8 @@ export async function GET(request: NextRequest) {
     const restauranteId = searchParams.get('restauranteId')
     const fechaDesde = searchParams.get('fechaDesde')
     const fechaHasta = searchParams.get('fechaHasta')
+    const tipoTurno = searchParams.get('tipoTurno')
+    const canalVenta = searchParams.get('canalVenta')
 
     // Construir filtros de fecha (usar hora local)
     const now = new Date()
@@ -40,6 +42,12 @@ export async function GET(request: NextRequest) {
     // Filtros base
     const baseWhere: any = {}
     if (restauranteId) baseWhere.restauranteId = restauranteId
+    if (tipoTurno && ['DAY', 'NIGHT'].includes(tipoTurno)) {
+      baseWhere.tipoTurno = tipoTurno
+    }
+    if (canalVenta && ['Local', 'Mesas', 'PedidosYa', 'Poked', 'Rainbowl', 'Volar'].includes(canalVenta)) {
+      baseWhere.canalVenta = canalVenta
+    }
     if (fechaDesde || fechaHasta) {
       baseWhere.fecha = {}
       if (fechaDesde) baseWhere.fecha.gte = new Date(fechaDesde)
@@ -50,17 +58,25 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Ventas del día (DAY)
-    const ventasDayHoy = await prisma.venta.aggregate({
-      where: {
-        ...baseWhere,
-        fecha: {
-          gte: today,
-          lt: tomorrow,
-          ...(baseWhere.fecha || {}),
-        },
-        tipoTurno: 'DAY',
+    // Construir where para DAY - solo si no hay filtro de turno o si el filtro es DAY
+    const whereDay: any = {
+      restauranteId: baseWhere.restauranteId,
+      canalVenta: baseWhere.canalVenta,
+      fecha: {
+        gte: today,
+        lt: tomorrow,
+        ...(baseWhere.fecha || {}),
       },
+    }
+    if (!tipoTurno || tipoTurno === 'DAY') {
+      whereDay.tipoTurno = 'DAY'
+    } else {
+      // Si el filtro es NIGHT, no buscar DAY - usar condición imposible
+      whereDay.id = 'impossible-id-that-does-not-exist'
+    }
+    
+    const ventasDayHoy = await prisma.venta.aggregate({
+      where: whereDay,
       _sum: {
         monto: true,
       },
@@ -69,17 +85,25 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // Ventas del día (NIGHT)
-    const ventasNightHoy = await prisma.venta.aggregate({
-      where: {
-        ...baseWhere,
-        fecha: {
-          gte: today,
-          lt: tomorrow,
-          ...(baseWhere.fecha || {}),
-        },
-        tipoTurno: 'NIGHT',
+    // Construir where para NIGHT - solo si no hay filtro de turno o si el filtro es NIGHT
+    const whereNight: any = {
+      restauranteId: baseWhere.restauranteId,
+      canalVenta: baseWhere.canalVenta,
+      fecha: {
+        gte: today,
+        lt: tomorrow,
+        ...(baseWhere.fecha || {}),
       },
+    }
+    if (!tipoTurno || tipoTurno === 'NIGHT') {
+      whereNight.tipoTurno = 'NIGHT'
+    } else {
+      // Si el filtro es DAY, no buscar NIGHT - usar condición imposible
+      whereNight.id = 'impossible-id-that-does-not-exist'
+    }
+    
+    const ventasNightHoy = await prisma.venta.aggregate({
+      where: whereNight,
       _sum: {
         monto: true,
       },
