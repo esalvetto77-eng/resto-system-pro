@@ -22,9 +22,11 @@ export default function NuevaVentaPage() {
   const [created, setCreated] = useState(false)
 
   useEffect(() => {
-    // Cargar el último restaurante usado desde localStorage
+    // Cargar los últimos valores usados desde localStorage
     if (restaurantes.length > 0 && !formData.restauranteId) {
       const ultimoRestauranteId = localStorage.getItem('ultimoRestauranteVenta')
+      const ultimaFecha = localStorage.getItem('ultimaFechaVenta')
+      const ultimoTipoTurno = localStorage.getItem('ultimoTipoTurnoVenta')
       
       // Verificar que el restaurante guardado aún existe en la lista
       const restauranteValido = ultimoRestauranteId && restaurantes.find(r => r.id === ultimoRestauranteId)
@@ -33,9 +35,28 @@ export default function NuevaVentaPage() {
         ? ultimoRestauranteId 
         : restaurantes[0].id // Fallback al primero si no hay guardado o no es válido
       
+      // Validar que la fecha guardada sea válida (no en el futuro y formato correcto)
+      let fechaInicial = ultimaFecha || new Date().toISOString().split('T')[0]
+      if (ultimaFecha) {
+        const fechaGuardada = new Date(ultimaFecha)
+        const hoy = new Date()
+        hoy.setHours(23, 59, 59, 999) // Fin del día de hoy
+        // Si la fecha guardada es válida y no es futura, usarla
+        if (isNaN(fechaGuardada.getTime()) || fechaGuardada > hoy) {
+          fechaInicial = new Date().toISOString().split('T')[0]
+        }
+      }
+      
+      // Validar que el tipo de turno sea válido
+      const tipoTurnoInicial = (ultimoTipoTurno === 'DAY' || ultimoTipoTurno === 'NIGHT') 
+        ? ultimoTipoTurno 
+        : 'DAY'
+      
       setFormData({
         ...formData,
         restauranteId: restauranteIdInicial,
+        fecha: fechaInicial,
+        tipoTurno: tipoTurnoInicial as 'DAY' | 'NIGHT',
       })
     }
   }, [restaurantes])
@@ -79,21 +100,23 @@ export default function NuevaVentaPage() {
         throw new Error(errorMessage)
       }
 
-      // Guardar el restaurante usado en localStorage
+      // Guardar los valores usados en localStorage
       localStorage.setItem('ultimoRestauranteVenta', formData.restauranteId)
+      localStorage.setItem('ultimaFechaVenta', formData.fecha)
+      localStorage.setItem('ultimoTipoTurnoVenta', formData.tipoTurno)
 
       // Mostrar confirmación
       setCreated(true)
 
       // Limpiar formulario y redirigir después de 2 segundos
       setTimeout(() => {
-        // Mantener el mismo restaurante que se usó
+        // Mantener los mismos valores que se usaron
         setFormData({
           restauranteId: formData.restauranteId, // Mantener el mismo restaurante
           monto: '',
-          tipoTurno: 'DAY',
+          tipoTurno: formData.tipoTurno, // Mantener el mismo tipo de turno
           canalVenta: '',
-          fecha: new Date().toISOString().split('T')[0],
+          fecha: formData.fecha, // Mantener la misma fecha
         })
         setCreated(false)
         router.push('/ventas/nuevo')
