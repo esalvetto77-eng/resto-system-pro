@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { RestauranteSelector } from '@/components/RestauranteSelector'
 import { useAuth } from '@/contexts/AuthContext'
-import { LayoutDashboard, Building2, Users, CalendarDays, Settings, Wallet, FileText, Package, Utensils, Warehouse, ShoppingCart, BookOpen, LogOut, DollarSign, Shield } from 'lucide-react'
+import { LayoutDashboard, Building2, Users, CalendarDays, Settings, Wallet, FileText, Package, Utensils, Warehouse, ShoppingCart, BookOpen, LogOut, DollarSign, Shield, BarChart3 } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, adminOnly: false },
@@ -23,6 +23,7 @@ const navigation = [
   // Ventas: ADMIN ve listado, ENCARGADO solo puede crear venta
   { name: 'Ventas', href: '/ventas', icon: DollarSign, adminOnly: true },
   { name: 'Nueva Venta', href: '/ventas/nuevo', icon: DollarSign, adminOnly: false, encargadoOnly: true },
+  { name: 'Análisis', href: '/analisis', icon: BarChart3, adminOnly: true },
   { name: 'Seguridad', href: '/usuarios/seguridad', icon: Shield, adminOnly: true },
 ]
 
