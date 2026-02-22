@@ -16,6 +16,7 @@ const navigation = [
   { name: 'Eventos Mensuales', href: '/eventos-mensuales' },
   { name: 'Liquidaciones', href: '/liquidaciones' },
   { name: 'Liquidaciones Pro', href: '/liquidaciones-profesionales' },
+  { name: 'Análisis', href: '/analisis' },
 ]
 
 export function Navbar() {
