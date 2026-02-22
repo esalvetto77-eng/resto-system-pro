@@ -22,11 +22,20 @@ export default function NuevaVentaPage() {
   const [created, setCreated] = useState(false)
 
   useEffect(() => {
-    // Pre-seleccionar el primer restaurante cuando carguen
+    // Cargar el último restaurante usado desde localStorage
     if (restaurantes.length > 0 && !formData.restauranteId) {
+      const ultimoRestauranteId = localStorage.getItem('ultimoRestauranteVenta')
+      
+      // Verificar que el restaurante guardado aún existe en la lista
+      const restauranteValido = ultimoRestauranteId && restaurantes.find(r => r.id === ultimoRestauranteId)
+      
+      const restauranteIdInicial = restauranteValido 
+        ? ultimoRestauranteId 
+        : restaurantes[0].id // Fallback al primero si no hay guardado o no es válido
+      
       setFormData({
         ...formData,
-        restauranteId: restaurantes[0].id,
+        restauranteId: restauranteIdInicial,
       })
     }
   }, [restaurantes])
@@ -70,13 +79,17 @@ export default function NuevaVentaPage() {
         throw new Error(errorMessage)
       }
 
+      // Guardar el restaurante usado en localStorage
+      localStorage.setItem('ultimoRestauranteVenta', formData.restauranteId)
+
       // Mostrar confirmación
       setCreated(true)
 
       // Limpiar formulario y redirigir después de 2 segundos
       setTimeout(() => {
+        // Mantener el mismo restaurante que se usó
         setFormData({
-          restauranteId: restaurantes.length > 0 ? restaurantes[0].id : '',
+          restauranteId: formData.restauranteId, // Mantener el mismo restaurante
           monto: '',
           tipoTurno: 'DAY',
           canalVenta: '',
