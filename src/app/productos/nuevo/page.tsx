@@ -204,13 +204,21 @@ export default function NuevoProductoPage() {
     setLoading(true)
 
     try {
+      const datosParaEnviar = {
+        ...formData,
+        proveedores: proveedoresValidos,
+      }
+      
+      console.log('[NUEVO PRODUCTO] Enviando datos:', datosParaEnviar)
+      console.log('[NUEVO PRODUCTO] Monedas en proveedores:', proveedoresValidos.map(p => ({ 
+        proveedorId: p.proveedorId, 
+        moneda: p.moneda 
+      })))
+      
       const response = await fetch('/api/productos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          proveedores: proveedoresValidos,
-        }),
+        body: JSON.stringify(datosParaEnviar),
       })
 
       if (!response.ok) {

@@ -126,18 +126,36 @@ export default function EditarProductoPage({
 
         // Cargar proveedores del producto
         if (producto.proveedores && Array.isArray(producto.proveedores) && producto.proveedores.length > 0) {
-          setProveedoresProducto(
-            producto.proveedores.map((pp: any) => ({
+          console.log('[EDITAR PRODUCTO] Proveedores recibidos del API:', producto.proveedores.map((pp: any) => ({
+            id: pp.id,
+            moneda: pp.moneda,
+            precioEnDolares: pp.precioEnDolares,
+            precioCompra: pp.precioCompra
+          })))
+          
+          const proveedoresMapeados = producto.proveedores.map((pp: any) => {
+            // Si no hay moneda pero hay precioEnDolares, usar USD
+            const moneda = pp.moneda || (pp.precioEnDolares ? 'USD' : 'UYU')
+            console.log('[EDITAR PRODUCTO] Mapeando proveedor:', pp.id, {
+              monedaGuardada: pp.moneda,
+              precioEnDolares: pp.precioEnDolares,
+              monedaFinal: moneda
+            })
+            
+            return {
               proveedorId: pp.proveedor?.id || '',
               precioCompra: pp.precioCompra || null,
-              moneda: pp.moneda || 'UYU',
+              moneda: moneda as 'USD' | 'UYU',
               ordenPreferencia: pp.ordenPreferencia || 1,
               unidadCompra: pp.unidadCompra || '',
               cantidadPorUnidadCompra: pp.cantidadPorUnidadCompra || null,
               tipoIVA: pp.tipoIVA || '22',
               precioIngresadoConIVA: pp.precioIngresadoConIVA || false,
-            }))
-          )
+            }
+          })
+          
+          console.log('[EDITAR PRODUCTO] Proveedores mapeados:', proveedoresMapeados)
+          setProveedoresProducto(proveedoresMapeados)
         } else {
           setProveedoresProducto([
             { proveedorId: '', precioCompra: null, moneda: 'UYU', ordenPreferencia: 1, unidadCompra: '', cantidadPorUnidadCompra: null, tipoIVA: '22', precioIngresadoConIVA: false },
@@ -270,6 +288,10 @@ export default function EditarProductoPage({
         ...formData,
         proveedores: proveedoresParaEnviar,
       })
+      console.log('[EDITAR PRODUCTO] Monedas en proveedores a enviar:', proveedoresParaEnviar.map(p => ({ 
+        proveedorId: p.proveedorId, 
+        moneda: p.moneda 
+      })))
       
       const response = await fetch(`/api/productos/${params.id}`, {
         method: 'PUT',
