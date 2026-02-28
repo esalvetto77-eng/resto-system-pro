@@ -430,7 +430,8 @@ export default function ProductosPage() {
                                 .map((pp, idx) => {
                                   const precioEnPesos = pp.precioEnPesos || (pp.moneda === 'UYU' ? pp.precioCompra : null)
                                   const isCheapest = idx === 0 && producto.proveedores.filter(p => p.precioCompra !== null).length > 1
-                                  const moneda = pp.moneda || 'UYU'
+                                  // Si tiene precioEnDolares pero no tiene moneda, asumir que es USD
+                                  const moneda = pp.moneda || (pp.precioEnDolares ? 'USD' : 'UYU')
                                   const precioConIVA = pp.precioConIVA || null
                                   const precioSinIVA = pp.precioSinIVA || null
                                   const tipoIVA = pp.tipoIVA || null
