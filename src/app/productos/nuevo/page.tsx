@@ -429,6 +429,12 @@ export default function NuevoProductoPage() {
                     </div>
                     {prov.precioCompra && prov.tipoIVA && (() => {
                       const { precioSinIVA, precioConIVA } = obtenerPreciosIVA(prov)
+                      const precioSinIVAEnPesos = prov.moneda === 'USD' && cotizacionDolar && precioSinIVA
+                        ? precioSinIVA * cotizacionDolar
+                        : null
+                      const precioConIVAEnPesos = prov.moneda === 'USD' && cotizacionDolar && precioConIVA
+                        ? precioConIVA * cotizacionDolar
+                        : null
                       return (
                         <div className="md:col-span-2 lg:col-span-3">
                           <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
@@ -441,12 +447,22 @@ export default function NuevoProductoPage() {
                                 <div className="text-base font-semibold text-blue-900">
                                   {formatCurrency(precioSinIVA)} {prov.moneda}
                                 </div>
+                                {precioSinIVAEnPesos && (
+                                  <div className="text-xs text-blue-700 mt-1">
+                                    ≈ {formatCurrency(precioSinIVAEnPesos)} UYU
+                                  </div>
+                                )}
                               </div>
                               <div>
                                 <div className="text-xs text-blue-600 mb-1">Precio Con IVA ({prov.tipoIVA}%):</div>
                                 <div className="text-base font-semibold text-blue-900">
                                   {formatCurrency(precioConIVA)} {prov.moneda}
                                 </div>
+                                {precioConIVAEnPesos && (
+                                  <div className="text-xs text-blue-700 mt-1">
+                                    ≈ {formatCurrency(precioConIVAEnPesos)} UYU
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -505,6 +521,12 @@ export default function NuevoProductoPage() {
                       const { precioSinIVA, precioConIVA } = obtenerPreciosIVA(prov)
                       const precioUnitarioSinIVA = precioSinIVA ? precioSinIVA / prov.cantidadPorUnidadCompra : null
                       const precioUnitarioConIVA = precioConIVA ? precioConIVA / prov.cantidadPorUnidadCompra : null
+                      const precioUnitarioSinIVAEnPesos = prov.moneda === 'USD' && cotizacionDolar && precioUnitarioSinIVA
+                        ? precioUnitarioSinIVA * cotizacionDolar
+                        : null
+                      const precioUnitarioConIVAEnPesos = prov.moneda === 'USD' && cotizacionDolar && precioUnitarioConIVA
+                        ? precioUnitarioConIVA * cotizacionDolar
+                        : null
                       return (
                         <div className="md:col-span-2 lg:col-span-3">
                           <div className="bg-neutral-50 p-3 rounded-md border border-neutral-200">
@@ -517,6 +539,11 @@ export default function NuevoProductoPage() {
                                 <div className="text-base font-semibold text-terracotta-700">
                                   {precioUnitarioSinIVA ? formatCurrency(precioUnitarioSinIVA) : '-'} {prov.moneda} / {formData.unidad}
                                 </div>
+                                {precioUnitarioSinIVAEnPesos && (
+                                  <div className="text-xs text-terracotta-600 mt-1 font-medium">
+                                    ≈ {formatCurrency(precioUnitarioSinIVAEnPesos)} UYU / {formData.unidad}
+                                  </div>
+                                )}
                                 {precioSinIVA && (
                                   <div className="text-xs text-neutral-500 mt-1">
                                     {precioSinIVA.toFixed(2)} {prov.moneda} ÷ {prov.cantidadPorUnidadCompra} {formData.unidad} = {precioUnitarioSinIVA?.toFixed(2)} {prov.moneda} / {formData.unidad}
@@ -528,6 +555,11 @@ export default function NuevoProductoPage() {
                                 <div className="text-base font-semibold text-terracotta-700">
                                   {precioUnitarioConIVA ? formatCurrency(precioUnitarioConIVA) : '-'} {prov.moneda} / {formData.unidad}
                                 </div>
+                                {precioUnitarioConIVAEnPesos && (
+                                  <div className="text-xs text-terracotta-600 mt-1 font-medium">
+                                    ≈ {formatCurrency(precioUnitarioConIVAEnPesos)} UYU / {formData.unidad}
+                                  </div>
+                                )}
                                 {precioConIVA && (
                                   <div className="text-xs text-neutral-500 mt-1">
                                     {precioConIVA.toFixed(2)} {prov.moneda} ÷ {prov.cantidadPorUnidadCompra} {formData.unidad} = {precioUnitarioConIVA?.toFixed(2)} {prov.moneda} / {formData.unidad}
