@@ -112,8 +112,10 @@ export async function GET(
         }>>(query)
         
         result.forEach((row) => {
+          // Si no hay moneda pero hay precioEnDolares, asumir que es USD
+          const moneda = row.moneda || (row.precioEnDolares ? 'USD' : null)
           camposAdicionales[row.id] = {
-            moneda: row.moneda || null,
+            moneda: moneda,
             precioEnDolares: row.precioEnDolares || null,
             precioEnPesos: row.precioEnPesos || null,
             cotizacionUsada: row.cotizacionUsada || null,
@@ -124,6 +126,13 @@ export async function GET(
             precioIngresadoConIVA: row.precioIngresadoConIVA || false,
             precioConIVA: row.precioConIVA || null,
             precioSinIVA: row.precioSinIVA || null,
+          }
+          if (row.moneda === 'USD' || row.precioEnDolares) {
+            console.log('[API PRODUCTO GET] Producto en USD detectado:', row.id, {
+              monedaGuardada: row.moneda,
+              monedaFinal: moneda,
+              precioEnDolares: row.precioEnDolares
+            })
           }
         })
       } catch (error: any) {
@@ -136,11 +145,18 @@ export async function GET(
       ...producto,
       proveedores: producto.proveedores.map((pp: any) => {
         const campos = camposAdicionales[pp.id] || {}
-        const moneda = campos.moneda || 'UYU'
+        // Si no hay moneda guardada pero hay precioEnDolares, usar USD
+        const moneda = campos.moneda || (campos.precioEnDolares ? 'USD' : 'UYU')
         const precioEnDolares = campos.precioEnDolares ?? null
         const precioEnPesos = campos.precioEnPesos ?? (moneda === 'UYU' ? pp.precioCompra : null)
         const cotizacionUsada = campos.cotizacionUsada ?? null
         const fechaCotizacion = campos.fechaCotizacion ?? null
+        
+        console.log('[API PRODUCTO GET] Procesando proveedor:', pp.id, {
+          monedaGuardada: campos.moneda,
+          precioEnDolares: campos.precioEnDolares,
+          monedaFinal: moneda
+        })
         
         return {
           ...pp,
@@ -328,9 +344,16 @@ export async function PUT(
             .filter((prov: any) => prov.proveedorId)
             .map((prov: any, index: number) => {
               const precioCompra = toNumberOrNull(prov.precioCompra)
-              const moneda = prov.moneda || 'UYU'
+              // Asegurar que la moneda se tome del request, no usar default
+              const moneda = prov.moneda === 'USD' || prov.moneda === 'UYU' ? prov.moneda : 'UYU'
               let precioEnDolares = null
               let precioEnPesos = null
+              
+              console.log('[API PRODUCTO PUT] Procesando proveedor:', prov.proveedorId, {
+                monedaRecibida: prov.moneda,
+                monedaFinal: moneda,
+                precioCompra
+              })
               
               if (moneda === 'USD' && precioCompra) {
                 precioEnDolares = precioCompra

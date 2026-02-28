@@ -345,9 +345,16 @@ export async function POST(request: NextRequest) {
           .filter((prov: any) => prov.proveedorId)
           .map((prov: any, index: number) => {
             const precioCompra = toNumberOrNull(prov.precioCompra)
-            const moneda = prov.moneda || 'UYU'
+            // Asegurar que la moneda se tome del request, no usar default
+            const moneda = prov.moneda === 'USD' || prov.moneda === 'UYU' ? prov.moneda : 'UYU'
             let precioEnDolares = null
             let precioEnPesos = null
+            
+            console.log('[API PRODUCTOS POST] Procesando proveedor:', prov.proveedorId, {
+              monedaRecibida: prov.moneda,
+              monedaFinal: moneda,
+              precioCompra
+            })
             
             if (moneda === 'USD' && precioCompra) {
               precioEnDolares = precioCompra
