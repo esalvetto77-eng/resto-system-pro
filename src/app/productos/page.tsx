@@ -471,11 +471,35 @@ export default function ProductosPage() {
                                       {tipoIVA && tipoIVA !== '0' && (precioConIVA || precioSinIVA) && (
                                         <div className="mt-1 text-xs text-neutral-500 space-y-0.5">
                                           {precioSinIVA && (
-                                            <div>Sin IVA: {formatCurrency(precioSinIVA)} {moneda}</div>
+                                            <div>
+                                              Sin IVA: {moneda === 'USD' ? (
+                                                <>
+                                                  ${precioSinIVA.toFixed(2)} USD
+                                                  {precioEnPesos && pp.precioCompra && pp.precioCompra > 0 && (
+                                                    <span className="ml-1 text-neutral-600">
+                                                      (≈ {formatCurrency((precioSinIVA / pp.precioCompra) * precioEnPesos)} UYU)
+                                                    </span>
+                                                  )}
+                                                </>
+                                              ) : (
+                                                <>{formatCurrency(precioSinIVA)} UYU</>
+                                              )}
+                                            </div>
                                           )}
                                           {precioConIVA && (
                                             <div className="font-medium text-neutral-700">
-                                              Con IVA ({tipoIVA}%): {formatCurrency(precioConIVA)} {moneda}
+                                              Con IVA ({tipoIVA}%): {moneda === 'USD' ? (
+                                                <>
+                                                  ${precioConIVA.toFixed(2)} USD
+                                                  {precioEnPesos && pp.precioCompra && pp.precioCompra > 0 && (
+                                                    <span className="ml-1 text-neutral-600">
+                                                      (≈ {formatCurrency((precioConIVA / pp.precioCompra) * precioEnPesos)} UYU)
+                                                    </span>
+                                                  )}
+                                                </>
+                                              ) : (
+                                                <>{formatCurrency(precioConIVA)} UYU</>
+                                              )}
                                             </div>
                                           )}
                                         </div>
