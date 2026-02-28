@@ -199,6 +199,13 @@ export async function PUT(
 ) {
   try {
     const body = await request.json()
+    
+    console.log('[API PRODUCTO PUT] Body recibido completo:', JSON.stringify(body, null, 2))
+    console.log('[API PRODUCTO PUT] Proveedores en body:', body.proveedores?.map((p: any) => ({
+      proveedorId: p.proveedorId,
+      moneda: p.moneda,
+      precioCompra: p.precioCompra
+    })))
 
     // Validar que el nombre esté presente
     if (!body.nombre || typeof body.nombre !== 'string' || body.nombre.trim() === '') {
