@@ -1,10 +1,10 @@
 export function formatCurrency(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '$0'
+  if (value === null || value === undefined) return '$0.00'
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
     currency: 'ARS',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value)
 }
 
