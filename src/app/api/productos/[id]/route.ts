@@ -399,7 +399,21 @@ export async function PUT(
           
           // Insertar proveedores según si los campos existen o no (verificado antes de la transacción)
           for (const datosProv of datosProveedores) {
+            // Asegurar que la moneda tenga un valor válido ANTES de cualquier inserción
+            const monedaFinal = datosProv.moneda === 'USD' || datosProv.moneda === 'UYU' 
+              ? datosProv.moneda 
+              : 'UYU'
+            
+            console.log('[API PRODUCTO PUT] Guardando proveedor:', {
+              proveedorId: datosProv.proveedorId,
+              monedaRecibida: datosProv.moneda,
+              monedaFinal: monedaFinal,
+              precioCompra: datosProv.precioCompra,
+              precioEnDolares: datosProv.precioEnDolares
+            })
+            
             if (camposMonedaExisten && camposPresentacionExisten && camposIVAExisten) {
+              
               // Insertar con todos los campos incluyendo IVA
               await tx.$executeRawUnsafe(`
                 INSERT INTO producto_proveedor (
@@ -432,7 +446,7 @@ export async function PUT(
                 datosProv.proveedorId,
                 datosProv.precioCompra,
                 datosProv.ordenPreferencia,
-                datosProv.moneda,
+                monedaFinal, // Usar monedaFinal en lugar de datosProv.moneda
                 datosProv.precioEnDolares,
                 datosProv.precioEnPesos,
                 datosProv.cotizacionUsada,
@@ -472,7 +486,7 @@ export async function PUT(
                 datosProv.proveedorId,
                 datosProv.precioCompra,
                 datosProv.ordenPreferencia,
-                datosProv.moneda,
+                monedaFinal, // Usar monedaFinal
                 datosProv.precioEnDolares,
                 datosProv.precioEnPesos,
                 datosProv.cotizacionUsada,
@@ -505,7 +519,7 @@ export async function PUT(
                 datosProv.proveedorId,
                 datosProv.precioCompra,
                 datosProv.ordenPreferencia,
-                datosProv.moneda,
+                monedaFinal, // Usar monedaFinal
                 datosProv.precioEnDolares,
                 datosProv.precioEnPesos,
                 datosProv.cotizacionUsada,
