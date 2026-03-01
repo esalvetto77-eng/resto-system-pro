@@ -114,6 +114,15 @@ export async function GET(
         result.forEach((row) => {
           // Si no hay moneda pero hay precioEnDolares, asumir que es USD
           const moneda = row.moneda || (row.precioEnDolares ? 'USD' : null)
+          
+          console.log('[API PRODUCTO GET] Leyendo proveedor desde BD:', row.id, {
+            monedaEnBD: row.moneda,
+            tipoMonedaEnBD: typeof row.moneda,
+            precioEnDolares: row.precioEnDolares,
+            precioEnPesos: row.precioEnPesos,
+            monedaFinal: moneda
+          })
+          
           camposAdicionales[row.id] = {
             moneda: moneda,
             precioEnDolares: row.precioEnDolares || null,
@@ -127,13 +136,9 @@ export async function GET(
             precioConIVA: row.precioConIVA || null,
             precioSinIVA: row.precioSinIVA || null,
           }
-          if (row.moneda === 'USD' || row.precioEnDolares) {
-            console.log('[API PRODUCTO GET] Producto en USD detectado:', row.id, {
-              monedaGuardada: row.moneda,
-              monedaFinal: moneda,
-              precioEnDolares: row.precioEnDolares
-            })
-          }
+          
+          // Log para todos los proveedores, no solo USD
+          console.log('[API PRODUCTO GET] Campos adicionales asignados:', row.id, camposAdicionales[row.id])
         })
       } catch (error: any) {
         console.log('[API PRODUCTO GET] Error al leer campos adicionales:', error?.message)
@@ -407,16 +412,27 @@ export async function PUT(
           // Insertar proveedores según si los campos existen o no (verificado antes de la transacción)
           for (const datosProv of datosProveedores) {
             // Asegurar que la moneda tenga un valor válido ANTES de cualquier inserción
-            const monedaFinal = datosProv.moneda === 'USD' || datosProv.moneda === 'UYU' 
-              ? datosProv.moneda 
-              : 'UYU'
+            // Validar explícitamente que sea string y que sea 'USD' o 'UYU'
+            let monedaFinal: string = 'UYU' // Default seguro
+            if (typeof datosProv.moneda === 'string') {
+              const monedaUpper = datosProv.moneda.toUpperCase().trim()
+              if (monedaUpper === 'USD' || monedaUpper === 'UYU') {
+                monedaFinal = monedaUpper
+              }
+            }
+            
+            // ACTUALIZAR datosProv.moneda con el valor final validado
+            datosProv.moneda = monedaFinal
             
             console.log('[API PRODUCTO PUT] Guardando proveedor:', {
               proveedorId: datosProv.proveedorId,
               monedaRecibida: datosProv.moneda,
+              tipoMonedaRecibida: typeof datosProv.moneda,
               monedaFinal: monedaFinal,
+              tipoMonedaFinal: typeof monedaFinal,
               precioCompra: datosProv.precioCompra,
-              precioEnDolares: datosProv.precioEnDolares
+              precioEnDolares: datosProv.precioEnDolares,
+              precioEnPesos: datosProv.precioEnPesos
             })
             
             if (camposMonedaExisten && camposPresentacionExisten && camposIVAExisten) {
@@ -453,7 +469,7 @@ export async function PUT(
                 datosProv.proveedorId,
                 datosProv.precioCompra,
                 datosProv.ordenPreferencia,
-                monedaFinal, // Usar monedaFinal en lugar de datosProv.moneda
+                monedaFinal, // Usar monedaFinal validada
                 datosProv.precioEnDolares,
                 datosProv.precioEnPesos,
                 datosProv.cotizacionUsada,
@@ -465,6 +481,20 @@ export async function PUT(
                 datosProv.precioConIVA,
                 datosProv.precioSinIVA
               )
+              
+              // Verificar qué se guardó realmente
+              const verificarGuardado = await tx.$queryRawUnsafe<Array<{ moneda: string | null }>>(`
+                SELECT "moneda" FROM "producto_proveedor" 
+                WHERE "productoId" = $1 AND "proveedorId" = $2
+              `, datosProv.productoId, datosProv.proveedorId)
+              
+              console.log('[API PRODUCTO PUT] Verificación post-INSERT:', {
+                productoId: datosProv.productoId,
+                proveedorId: datosProv.proveedorId,
+                monedaEnviada: monedaFinal,
+                monedaGuardadaEnBD: verificarGuardado[0]?.moneda,
+                tipoMonedaEnBD: typeof verificarGuardado[0]?.moneda
+              })
             } else if (camposMonedaExisten && camposPresentacionExisten) {
               // Insertar con campos de moneda y presentación pero sin IVA
               await tx.$executeRawUnsafe(`
@@ -493,7 +523,7 @@ export async function PUT(
                 datosProv.proveedorId,
                 datosProv.precioCompra,
                 datosProv.ordenPreferencia,
-                monedaFinal, // Usar monedaFinal
+                monedaFinal, // Usar monedaFinal validada
                 datosProv.precioEnDolares,
                 datosProv.precioEnPesos,
                 datosProv.cotizacionUsada,

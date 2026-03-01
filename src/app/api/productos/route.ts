@@ -406,16 +406,27 @@ export async function POST(request: NextRequest) {
         // Insertar proveedores según si los campos existen o no (verificado antes de la transacción)
         for (const datosProv of proveedoresParaCrear) {
           // Asegurar que la moneda tenga un valor válido ANTES de cualquier inserción
-          const monedaFinal = datosProv.moneda === 'USD' || datosProv.moneda === 'UYU' 
-            ? datosProv.moneda 
-            : 'UYU'
+          // Validar explícitamente que sea string y que sea 'USD' o 'UYU'
+          let monedaFinal: string = 'UYU' // Default seguro
+          if (typeof datosProv.moneda === 'string') {
+            const monedaUpper = datosProv.moneda.toUpperCase().trim()
+            if (monedaUpper === 'USD' || monedaUpper === 'UYU') {
+              monedaFinal = monedaUpper
+            }
+          }
+          
+          // ACTUALIZAR datosProv.moneda con el valor final validado
+          datosProv.moneda = monedaFinal
           
           console.log('[API PRODUCTOS POST] Guardando proveedor:', {
             proveedorId: datosProv.proveedorId,
             monedaRecibida: datosProv.moneda,
+            tipoMonedaRecibida: typeof datosProv.moneda,
             monedaFinal: monedaFinal,
+            tipoMonedaFinal: typeof monedaFinal,
             precioCompra: datosProv.precioCompra,
-            precioEnDolares: datosProv.precioEnDolares
+            precioEnDolares: datosProv.precioEnDolares,
+            precioEnPesos: datosProv.precioEnPesos
           })
           
           if (camposMonedaExisten && camposPresentacionExisten && camposIVAExisten) {
@@ -452,7 +463,7 @@ export async function POST(request: NextRequest) {
               datosProv.proveedorId,
               datosProv.precioCompra,
               datosProv.ordenPreferencia,
-              monedaFinal, // Usar monedaFinal en lugar de datosProv.moneda
+              monedaFinal, // Usar monedaFinal validada
               datosProv.precioEnDolares,
               datosProv.precioEnPesos,
               datosProv.cotizacionUsada,

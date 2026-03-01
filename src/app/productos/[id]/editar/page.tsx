@@ -126,19 +126,35 @@ export default function EditarProductoPage({
 
         // Cargar proveedores del producto
         if (producto.proveedores && Array.isArray(producto.proveedores) && producto.proveedores.length > 0) {
+          console.log('[EDITAR PRODUCTO] Proveedores recibidos del API (RAW):', JSON.stringify(producto.proveedores, null, 2))
           console.log('[EDITAR PRODUCTO] Proveedores recibidos del API:', producto.proveedores.map((pp: any) => ({
             id: pp.id,
             moneda: pp.moneda,
             precioEnDolares: pp.precioEnDolares,
-            precioCompra: pp.precioCompra
+            precioCompra: pp.precioCompra,
+            precioEnPesos: pp.precioEnPesos
           })))
           
           const proveedoresMapeados = producto.proveedores.map((pp: any) => {
             // Si no hay moneda pero hay precioEnDolares, usar USD
-            const moneda = pp.moneda || (pp.precioEnDolares ? 'USD' : 'UYU')
+            // También verificar si precioEnPesos es diferente de precioCompra (indicaría conversión)
+            let moneda = pp.moneda
+            if (!moneda) {
+              if (pp.precioEnDolares) {
+                moneda = 'USD'
+              } else if (pp.precioEnPesos && pp.precioCompra && pp.precioEnPesos !== pp.precioCompra) {
+                // Si precioEnPesos es diferente de precioCompra, probablemente es USD convertido
+                moneda = 'USD'
+              } else {
+                moneda = 'UYU'
+              }
+            }
+            
             console.log('[EDITAR PRODUCTO] Mapeando proveedor:', pp.id, {
               monedaGuardada: pp.moneda,
               precioEnDolares: pp.precioEnDolares,
+              precioEnPesos: pp.precioEnPesos,
+              precioCompra: pp.precioCompra,
               monedaFinal: moneda
             })
             
@@ -154,7 +170,7 @@ export default function EditarProductoPage({
             }
           })
           
-          console.log('[EDITAR PRODUCTO] Proveedores mapeados:', proveedoresMapeados)
+          console.log('[EDITAR PRODUCTO] Proveedores mapeados (FINAL):', JSON.stringify(proveedoresMapeados, null, 2))
           setProveedoresProducto(proveedoresMapeados)
         } else {
           setProveedoresProducto([
@@ -273,33 +289,41 @@ export default function EditarProductoPage({
 
     try {
       // Preparar datos de proveedores con campos de moneda, presentación e IVA
-      const proveedoresParaEnviar = proveedoresValidos.map((p) => ({
-        proveedorId: p.proveedorId,
-        precioCompra: p.precioCompra,
-        ordenPreferencia: p.ordenPreferencia,
-        moneda: p.moneda,
-        unidadCompra: p.unidadCompra,
-        cantidadPorUnidadCompra: p.cantidadPorUnidadCompra,
-        tipoIVA: p.tipoIVA,
-        precioIngresadoConIVA: p.precioIngresadoConIVA,
-      }))
+      const proveedoresParaEnviar = proveedoresValidos.map((p) => {
+        console.log('[EDITAR PRODUCTO] Preparando proveedor para enviar:', {
+          proveedorId: p.proveedorId,
+          moneda: p.moneda,
+          tipoMoneda: typeof p.moneda,
+          precioCompra: p.precioCompra
+        })
+        return {
+          proveedorId: p.proveedorId,
+          precioCompra: p.precioCompra,
+          ordenPreferencia: p.ordenPreferencia,
+          moneda: p.moneda, // Asegurar que se envíe exactamente como está
+          unidadCompra: p.unidadCompra,
+          cantidadPorUnidadCompra: p.cantidadPorUnidadCompra,
+          tipoIVA: p.tipoIVA,
+          precioIngresadoConIVA: p.precioIngresadoConIVA,
+        }
+      })
       
-      console.log('[EDITAR PRODUCTO] Enviando datos:', {
+      const datosCompletos = {
         ...formData,
         proveedores: proveedoresParaEnviar,
-      })
+      }
+      
+      console.log('[EDITAR PRODUCTO] Enviando datos (JSON):', JSON.stringify(datosCompletos, null, 2))
       console.log('[EDITAR PRODUCTO] Monedas en proveedores a enviar:', proveedoresParaEnviar.map(p => ({ 
         proveedorId: p.proveedorId, 
-        moneda: p.moneda 
+        moneda: p.moneda,
+        tipo: typeof p.moneda
       })))
       
       const response = await fetch(`/api/productos/${params.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          proveedores: proveedoresParaEnviar,
-        }),
+        body: JSON.stringify(datosCompletos),
       })
 
       if (!response.ok) {
