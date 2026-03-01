@@ -429,58 +429,66 @@ export async function POST(request: NextRequest) {
             precioEnPesos: datosProv.precioEnPesos
           })
           
-          // SOLUCIÓN EFICAZ: Usar Prisma.upsert() directamente - más confiable que SQL crudo
+          // SOLUCIÓN EFICAZ: Usar SQL crudo con parámetros seguros para garantizar que moneda se guarde
           const monedaParaGuardar: string = monedaFinal || 'UYU'
           
-          console.log('[API PRODUCTOS POST] Usando Prisma.upsert con moneda:', {
+          console.log('[API PRODUCTOS POST] Guardando proveedor con moneda:', {
             proveedorId: datosProv.proveedorId,
             monedaFinal: monedaFinal,
             monedaParaGuardar: monedaParaGuardar,
             tipo: typeof monedaParaGuardar
           })
           
-          const dataToUpsert: any = {
-            precioCompra: datosProv.precioCompra,
-            ordenPreferencia: datosProv.ordenPreferencia,
-            moneda: monedaParaGuardar, // SIEMPRE incluir moneda
-          }
+          // Construir SQL dinámicamente según qué campos existen
+          let camposSQL = '"productoId", "proveedorId", "precioCompra", "ordenPreferencia"'
+          let valoresSQL = '$1, $2, $3, $4'
+          let params: any[] = [datosProv.productoId, datosProv.proveedorId, datosProv.precioCompra, datosProv.ordenPreferencia]
+          let paramIndex = 5
           
-          // Agregar campos opcionales solo si existen
           if (camposMonedaExisten) {
-            dataToUpsert.precioEnDolares = datosProv.precioEnDolares
-            dataToUpsert.precioEnPesos = datosProv.precioEnPesos
-            dataToUpsert.cotizacionUsada = datosProv.cotizacionUsada
-            dataToUpsert.fechaCotizacion = datosProv.fechaCotizacion
+            camposSQL += ', "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion"'
+            valoresSQL += `, $${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}`
+            params.push(monedaParaGuardar, datosProv.precioEnDolares, datosProv.precioEnPesos, datosProv.cotizacionUsada, datosProv.fechaCotizacion)
+            paramIndex += 5
           }
           
           if (camposPresentacionExisten) {
-            dataToUpsert.unidadCompra = datosProv.unidadCompra
-            dataToUpsert.cantidadPorUnidadCompra = datosProv.cantidadPorUnidadCompra
+            camposSQL += ', "unidadCompra", "cantidadPorUnidadCompra"'
+            valoresSQL += `, $${paramIndex}, $${paramIndex + 1}`
+            params.push(datosProv.unidadCompra, datosProv.cantidadPorUnidadCompra)
+            paramIndex += 2
           }
           
           if (camposIVAExisten) {
-            dataToUpsert.tipoIVA = datosProv.tipoIVA
-            dataToUpsert.precioIngresadoConIVA = datosProv.precioIngresadoConIVA
-            dataToUpsert.precioConIVA = datosProv.precioConIVA
-            dataToUpsert.precioSinIVA = datosProv.precioSinIVA
+            camposSQL += ', "tipoIVA", "precioIngresadoConIVA", "precioConIVA", "precioSinIVA"'
+            valoresSQL += `, $${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}`
+            params.push(datosProv.tipoIVA, datosProv.precioIngresadoConIVA, datosProv.precioConIVA, datosProv.precioSinIVA)
+            paramIndex += 4
           }
           
-          await tx.productoProveedor.upsert({
-            where: {
-              productoId_proveedorId: {
-                productoId: datosProv.productoId,
-                proveedorId: datosProv.proveedorId,
-              },
-            },
-            create: {
-              productoId: datosProv.productoId,
-              proveedorId: datosProv.proveedorId,
-              ...dataToUpsert,
-            },
-            update: dataToUpsert,
-          })
+          // Construir UPDATE dinámico
+          let updateSQL = '"precioCompra" = EXCLUDED."precioCompra", "ordenPreferencia" = EXCLUDED."ordenPreferencia"'
+          if (camposMonedaExisten) {
+            updateSQL += `, "moneda" = $5, "precioEnDolares" = EXCLUDED."precioEnDolares", "precioEnPesos" = EXCLUDED."precioEnPesos", "cotizacionUsada" = EXCLUDED."cotizacionUsada", "fechaCotizacion" = EXCLUDED."fechaCotizacion"`
+          }
+          if (camposPresentacionExisten) {
+            updateSQL += ', "unidadCompra" = EXCLUDED."unidadCompra", "cantidadPorUnidadCompra" = EXCLUDED."cantidadPorUnidadCompra"'
+          }
+          if (camposIVAExisten) {
+            updateSQL += ', "tipoIVA" = EXCLUDED."tipoIVA", "precioIngresadoConIVA" = EXCLUDED."precioIngresadoConIVA", "precioConIVA" = EXCLUDED."precioConIVA", "precioSinIVA" = EXCLUDED."precioSinIVA"'
+          }
           
-          console.log('[API PRODUCTOS POST] Upsert completado con moneda:', monedaParaGuardar)
+          const sqlQueryFinal = `
+            INSERT INTO producto_proveedor (id, ${camposSQL}, "createdAt", "updatedAt")
+            VALUES (gen_random_uuid()::text, ${valoresSQL}, NOW(), NOW())
+            ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
+              ${updateSQL},
+              "updatedAt" = NOW()
+          `
+          
+          await tx.$executeRawUnsafe(sqlQueryFinal, ...params)
+          
+          console.log('[API PRODUCTOS POST] Proveedor guardado exitosamente con moneda:', monedaParaGuardar)
         }
       }
 
