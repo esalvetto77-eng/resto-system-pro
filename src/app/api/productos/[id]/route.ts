@@ -430,9 +430,8 @@ export async function PUT(
             
             console.log('[API PRODUCTO PUT] Guardando proveedor con moneda:', {
               proveedorId: datosProv.proveedorId,
-              monedaFinal: monedaFinal,
-              monedaParaGuardar: monedaParaGuardar,
-              tipo: typeof monedaParaGuardar
+              monedaRecibida: datosProv.moneda,
+              monedaParaGuardar: monedaParaGuardar
             })
             
             // Construir SQL dinámicamente según qué campos existen

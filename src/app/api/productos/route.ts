@@ -424,9 +424,8 @@ export async function POST(request: NextRequest) {
           
           console.log('[API PRODUCTOS POST] Guardando proveedor con moneda:', {
             proveedorId: datosProv.proveedorId,
-            monedaFinal: monedaFinal,
-            monedaParaGuardar: monedaParaGuardar,
-            tipo: typeof monedaParaGuardar
+            monedaRecibida: datosProv.moneda,
+            monedaParaGuardar: monedaParaGuardar
           })
           
           // Construir SQL dinámicamente según qué campos existen
