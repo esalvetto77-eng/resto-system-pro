@@ -24,9 +24,26 @@ export async function GET(request: NextRequest) {
     
     const productos = await prisma.producto.findMany({
       where: whereClause,
-      include: {
+      select: {
+        id: true,
+        nombre: true,
+        codigo: true,
+        descripcion: true,
+        unidad: true,
+        stockMinimo: true,
+        rubro: true,
+        activo: true,
+        createdAt: true,
+        updatedAt: true,
         proveedores: {
-          include: {
+          select: {
+            id: true,
+            productoId: true,
+            proveedorId: true,
+            precioCompra: true,
+            ordenPreferencia: true,
+            createdAt: true,
+            updatedAt: true,
             proveedor: {
               select: {
                 id: true,
@@ -40,14 +57,77 @@ export async function GET(request: NextRequest) {
             ordenPreferencia: 'asc',
           },
         },
-        inventario: true,
+        inventario: {
+          select: {
+            id: true,
+            productoId: true,
+            stockActual: true,
+            ultimaActualizacion: true,
+          },
+        },
       },
       orderBy: {
         nombre: 'asc',
       },
     })
+    
+    // Leer campos adicionales usando SQL directo
+    const productosConCamposAdicionales = await Promise.all(
+      productos.map(async (producto) => {
+        if (producto.proveedores.length === 0) return producto
+        
+        try {
+          const proveedorIds = producto.proveedores.map(pp => pp.id)
+          const idsList = proveedorIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',')
+          const query = `
+            SELECT 
+              id,
+              "moneda",
+              "precioEnDolares",
+              "precioEnPesos",
+              "cotizacionUsada",
+              "fechaCotizacion",
+              "unidadCompra",
+              "cantidadPorUnidadCompra",
+              "tipoIVA",
+              "precioIngresadoConIVA",
+              "precioConIVA",
+              "precioSinIVA"
+            FROM "producto_proveedor"
+            WHERE id IN (${idsList})
+          `
+          const camposAdicionales = await prisma.$queryRawUnsafe<Array<{
+            id: string
+            moneda?: string | null
+            precioEnDolares?: number | null
+            precioEnPesos?: number | null
+            cotizacionUsada?: number | null
+            fechaCotizacion?: Date | null
+            unidadCompra?: string | null
+            cantidadPorUnidadCompra?: number | null
+            tipoIVA?: string | null
+            precioIngresadoConIVA?: boolean | null
+            precioConIVA?: number | null
+            precioSinIVA?: number | null
+          }>>(query)
+          
+          const camposMap = new Map(camposAdicionales.map(c => [c.id, c]))
+          
+          return {
+            ...producto,
+            proveedores: producto.proveedores.map(pp => ({
+              ...pp,
+              ...(camposMap.get(pp.id) || {}),
+            })),
+          }
+        } catch (error) {
+          // Si falla, devolver sin campos adicionales
+          return producto
+        }
+      })
+    )
 
-    return NextResponse.json(productos)
+    return NextResponse.json(productosConCamposAdicionales)
   } catch (error: any) {
     console.error('[API PRODUCTOS GET] Error:', error)
     return NextResponse.json(
@@ -151,26 +231,63 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // USAR PRISMA.create() DIRECTAMENTE - SIMPLE
-          await tx.productoProveedor.create({
-            data: {
-              productoId: nuevoProducto.id,
-              proveedorId: prov.proveedorId,
-              precioCompra: precioCompra,
-              ordenPreferencia: prov.ordenPreferencia || 1,
-              moneda: moneda, // SIEMPRE establecer explícitamente
-              precioEnDolares: precioEnDolares,
-              precioEnPesos: precioEnPesos,
-              cotizacionUsada: moneda === 'USD' ? cotizacionActual : null,
-              fechaCotizacion: moneda === 'USD' && cotizacionActual ? new Date() : null,
-              unidadCompra: prov.unidadCompra?.trim() || null,
-              cantidadPorUnidadCompra: prov.cantidadPorUnidadCompra ? Number(prov.cantidadPorUnidadCompra) : null,
-              tipoIVA: prov.tipoIVA || null,
-              precioIngresadoConIVA: prov.precioIngresadoConIVA || false,
-              precioConIVA: precioConIVA,
-              precioSinIVA: precioSinIVA,
-            },
-          })
+          // Usar SQL directo para crear con todos los campos (incluyendo los que pueden no existir)
+          try {
+            await tx.$executeRawUnsafe(`
+              INSERT INTO producto_proveedor (
+                id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
+                "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
+                "unidadCompra", "cantidadPorUnidadCompra",
+                "tipoIVA", "precioIngresadoConIVA", "precioConIVA", "precioSinIVA",
+                "createdAt", "updatedAt"
+              )
+              VALUES (
+                gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW()
+              )
+            `,
+              nuevoProducto.id,
+              prov.proveedorId,
+              precioCompra,
+              prov.ordenPreferencia || 1,
+              moneda, // MONEDA SIEMPRE EXPLÍCITA
+              precioEnDolares,
+              precioEnPesos,
+              moneda === 'USD' ? cotizacionActual : null,
+              moneda === 'USD' && cotizacionActual ? new Date() : null,
+              prov.unidadCompra?.trim() || null,
+              prov.cantidadPorUnidadCompra ? Number(prov.cantidadPorUnidadCompra) : null,
+              prov.tipoIVA || null,
+              prov.precioIngresadoConIVA || false,
+              precioConIVA,
+              precioSinIVA
+            )
+          } catch (error: any) {
+            // Si falla por campos que no existen, crear solo con campos básicos + moneda
+            if (error?.code === '42703' || error?.message?.includes('does not exist')) {
+              await tx.$executeRawUnsafe(`
+                INSERT INTO producto_proveedor (
+                  id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
+                  "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
+                  "createdAt", "updatedAt"
+                )
+                VALUES (
+                  gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
+                )
+              `,
+                nuevoProducto.id,
+                prov.proveedorId,
+                precioCompra,
+                prov.ordenPreferencia || 1,
+                moneda, // MONEDA SIEMPRE EXPLÍCITA
+                precioEnDolares,
+                precioEnPesos,
+                moneda === 'USD' ? cotizacionActual : null,
+                moneda === 'USD' && cotizacionActual ? new Date() : null
+              )
+            } else {
+              throw error
+            }
+          }
 
           console.log('[API PRODUCTOS POST] ✅ Proveedor creado:', {
             proveedorId: prov.proveedorId,
@@ -179,12 +296,29 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 5. Retornar producto creado
+      // 5. Retornar producto creado (sin campos adicionales, se leerán después)
       return await tx.producto.findUnique({
         where: { id: nuevoProducto.id },
-        include: {
+        select: {
+          id: true,
+          nombre: true,
+          codigo: true,
+          descripcion: true,
+          unidad: true,
+          stockMinimo: true,
+          rubro: true,
+          activo: true,
+          createdAt: true,
+          updatedAt: true,
           proveedores: {
-            include: {
+            select: {
+              id: true,
+              productoId: true,
+              proveedorId: true,
+              precioCompra: true,
+              ordenPreferencia: true,
+              createdAt: true,
+              updatedAt: true,
               proveedor: {
                 select: {
                   id: true,
@@ -198,11 +332,71 @@ export async function POST(request: NextRequest) {
               ordenPreferencia: 'asc',
             },
           },
-          inventario: true,
+          inventario: {
+            select: {
+              id: true,
+              productoId: true,
+              stockActual: true,
+              ultimaActualizacion: true,
+            },
+          },
         },
       })
     })
 
+    // Leer campos adicionales después de la transacción
+    if (producto && producto.proveedores.length > 0) {
+      try {
+        const proveedorIds = producto.proveedores.map(pp => pp.id)
+        const idsList = proveedorIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',')
+        const query = `
+          SELECT 
+            id,
+            "moneda",
+            "precioEnDolares",
+            "precioEnPesos",
+            "cotizacionUsada",
+            "fechaCotizacion",
+            "unidadCompra",
+            "cantidadPorUnidadCompra",
+            "tipoIVA",
+            "precioIngresadoConIVA",
+            "precioConIVA",
+            "precioSinIVA"
+          FROM "producto_proveedor"
+          WHERE id IN (${idsList})
+        `
+        const camposAdicionales = await prisma.$queryRawUnsafe<Array<{
+          id: string
+          moneda?: string | null
+          precioEnDolares?: number | null
+          precioEnPesos?: number | null
+          cotizacionUsada?: number | null
+          fechaCotizacion?: Date | null
+          unidadCompra?: string | null
+          cantidadPorUnidadCompra?: number | null
+          tipoIVA?: string | null
+          precioIngresadoConIVA?: boolean | null
+          precioConIVA?: number | null
+          precioSinIVA?: number | null
+        }>>(query)
+        
+        const camposMap = new Map(camposAdicionales.map(c => [c.id, c]))
+        
+        const productoConCampos = {
+          ...producto,
+          proveedores: producto.proveedores.map(pp => ({
+            ...pp,
+            ...(camposMap.get(pp.id) || {}),
+          })),
+        }
+        
+        return NextResponse.json(productoConCampos, { status: 201 })
+      } catch (error) {
+        return NextResponse.json(producto, { status: 201 })
+      }
+    }
+    
     return NextResponse.json(producto, { status: 201 })
   } catch (error: any) {
     console.error('[API PRODUCTOS POST] Error:', error)

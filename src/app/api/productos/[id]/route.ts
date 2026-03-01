@@ -1,9 +1,7 @@
-// API Route para operaciones individuales de Productos - Versión simplificada
+// API Route para operaciones individuales de Productos - REESCRITO DESDE CERO
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentUser, isAdmin } from '@/lib/auth'
 
-// CRÍTICO: Usar Node.js runtime para Prisma (no Edge)
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
@@ -13,9 +11,6 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    console.log('[API PRODUCTO] Obteniendo producto:', params.id)
-    
-    // Usar select explícito para evitar leer campos que no existen en la BD
     const producto = await prisma.producto.findUnique({
       where: { id: params.id },
       select: {
@@ -63,21 +58,16 @@ export async function GET(
     })
 
     if (!producto) {
-      console.log('[API PRODUCTO] Producto no encontrado:', params.id)
       return NextResponse.json(
         { error: 'Producto no encontrado' },
         { status: 404 }
       )
     }
 
-    console.log('[API PRODUCTO] Producto encontrado:', producto.id, producto.nombre)
-
-    // Leer campos adicionales (moneda y presentación) usando SQL directo
-    const proveedorIds = producto.proveedores.map(pp => pp.id).filter((id): id is string => id !== undefined)
-    let camposAdicionales: Record<string, any> = {}
-    
-    if (proveedorIds.length > 0) {
+    // Leer campos adicionales usando SQL directo
+    if (producto.proveedores.length > 0) {
       try {
+        const proveedorIds = producto.proveedores.map(pp => pp.id)
         const idsList = proveedorIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',')
         const query = `
           SELECT 
@@ -96,7 +86,7 @@ export async function GET(
           FROM "producto_proveedor"
           WHERE id IN (${idsList})
         `
-        const result = await prisma.$queryRawUnsafe<Array<{
+        const camposAdicionales = await prisma.$queryRawUnsafe<Array<{
           id: string
           moneda?: string | null
           precioEnDolares?: number | null
@@ -111,87 +101,27 @@ export async function GET(
           precioSinIVA?: number | null
         }>>(query)
         
-        result.forEach((row) => {
-          // Si no hay moneda pero hay precioEnDolares, asumir que es USD
-          const moneda = row.moneda || (row.precioEnDolares ? 'USD' : null)
-          
-          console.log('[API PRODUCTO GET] Leyendo proveedor desde BD:', row.id, {
-            monedaEnBD: row.moneda,
-            tipoMonedaEnBD: typeof row.moneda,
-            precioEnDolares: row.precioEnDolares,
-            precioEnPesos: row.precioEnPesos,
-            monedaFinal: moneda
-          })
-          
-          camposAdicionales[row.id] = {
-            moneda: moneda,
-            precioEnDolares: row.precioEnDolares || null,
-            precioEnPesos: row.precioEnPesos || null,
-            cotizacionUsada: row.cotizacionUsada || null,
-            fechaCotizacion: row.fechaCotizacion ? row.fechaCotizacion.toISOString() : null,
-            unidadCompra: row.unidadCompra || null,
-            cantidadPorUnidadCompra: row.cantidadPorUnidadCompra || null,
-            tipoIVA: row.tipoIVA || null,
-            precioIngresadoConIVA: row.precioIngresadoConIVA || false,
-            precioConIVA: row.precioConIVA || null,
-            precioSinIVA: row.precioSinIVA || null,
-          }
-          
-          // Log para todos los proveedores, no solo USD
-          console.log('[API PRODUCTO GET] Campos adicionales asignados:', row.id, camposAdicionales[row.id])
-        })
-      } catch (error: any) {
-        console.log('[API PRODUCTO GET] Error al leer campos adicionales:', error?.message)
+        const camposMap = new Map(camposAdicionales.map(c => [c.id, c]))
+        
+        const productoConCampos = {
+          ...producto,
+          proveedores: producto.proveedores.map(pp => ({
+            ...pp,
+            ...(camposMap.get(pp.id) || {}),
+          })),
+        }
+        
+        return NextResponse.json(productoConCampos)
+      } catch (error) {
+        return NextResponse.json(producto)
       }
     }
     
-    // Asegurar que los campos nuevos tengan valores por defecto si son null (para productos antiguos)
-    const productoConDefaults = {
-      ...producto,
-      proveedores: producto.proveedores.map((pp: any) => {
-        const campos = camposAdicionales[pp.id] || {}
-        // Si no hay moneda guardada pero hay precioEnDolares, usar USD
-        const moneda = campos.moneda || (campos.precioEnDolares ? 'USD' : 'UYU')
-        const precioEnDolares = campos.precioEnDolares ?? null
-        const precioEnPesos = campos.precioEnPesos ?? (moneda === 'UYU' ? pp.precioCompra : null)
-        const cotizacionUsada = campos.cotizacionUsada ?? null
-        const fechaCotizacion = campos.fechaCotizacion ?? null
-        
-        console.log('[API PRODUCTO GET] Procesando proveedor:', pp.id, {
-          monedaGuardada: campos.moneda,
-          precioEnDolares: campos.precioEnDolares,
-          monedaFinal: moneda
-        })
-        
-        return {
-          ...pp,
-          moneda,
-          precioEnDolares,
-          precioEnPesos,
-          cotizacionUsada,
-          fechaCotizacion,
-          unidadCompra: campos.unidadCompra || null,
-          cantidadPorUnidadCompra: campos.cantidadPorUnidadCompra || null,
-          tipoIVA: campos.tipoIVA || null,
-          precioIngresadoConIVA: campos.precioIngresadoConIVA || false,
-          precioConIVA: campos.precioConIVA || null,
-          precioSinIVA: campos.precioSinIVA || null,
-        }
-      }),
-    }
-
-    console.log('[API PRODUCTO] Producto procesado, devolviendo respuesta')
-    return NextResponse.json(productoConDefaults)
+    return NextResponse.json(producto)
   } catch (error: any) {
-    console.error('[API PRODUCTO] Error completo:', error)
-    console.error('[API PRODUCTO] Error message:', error?.message)
-    console.error('[API PRODUCTO] Error stack:', error?.stack)
-    console.error('[API PRODUCTO] Error name:', error?.name)
+    console.error('[API PRODUCTO GET] Error:', error)
     return NextResponse.json(
-      { 
-        error: 'Error al obtener producto',
-        details: error?.message || String(error),
-      },
+      { error: 'Error al obtener producto' },
       { status: 500 }
     )
   }
@@ -204,15 +134,7 @@ export async function PUT(
 ) {
   try {
     const body = await request.json()
-    
-    console.log('[API PRODUCTO PUT] Body recibido completo:', JSON.stringify(body, null, 2))
-    console.log('[API PRODUCTO PUT] Proveedores en body:', body.proveedores?.map((p: any) => ({
-      proveedorId: p.proveedorId,
-      moneda: p.moneda,
-      precioCompra: p.precioCompra
-    })))
 
-    // Validar que el nombre esté presente
     if (!body.nombre || typeof body.nombre !== 'string' || body.nombre.trim() === '') {
       return NextResponse.json(
         { error: 'El nombre es requerido' },
@@ -220,308 +142,166 @@ export async function PUT(
       )
     }
 
-    // Verificar que el producto existe
-    const productoExistente = await prisma.producto.findUnique({
-      where: { id: params.id },
-    })
-    if (!productoExistente) {
-      return NextResponse.json(
-        { error: 'Producto no encontrado' },
-        { status: 404 }
-      )
-    }
-
-    const toStringOrNull = (value: unknown): string | null => {
-      if (value === null || value === undefined || value === '') return null
-      if (typeof value === 'string') return value.trim() || null
-      return null
-    }
-
-    const toNumberOrNull = (value: unknown): number | null => {
-      if (value === null || value === undefined || value === '') return null
-      if (typeof value === 'number') return value
-      if (typeof value === 'string') {
-        const parsed = parseFloat(value)
-        return isNaN(parsed) ? null : parsed
-      }
-      return null
-    }
-
-    console.log('[API PRODUCTO PUT] Iniciando actualización de producto:', params.id)
-    console.log('[API PRODUCTO PUT] Body recibido:', JSON.stringify(body, null, 2))
-    
-    // Verificar si los campos de moneda, presentación e IVA existen ANTES de la transacción
-    let camposMonedaExisten = false
-    let camposPresentacionExisten = false
-    let camposIVAExisten = false
-    try {
-      // Intentar una consulta simple para verificar si los campos existen
-      await prisma.$queryRawUnsafe(`SELECT "moneda" FROM "producto_proveedor" LIMIT 1`)
-      camposMonedaExisten = true
-      console.log('[API PRODUCTO PUT] Campos de moneda existen en BD')
-    } catch (error: any) {
-      if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
-        console.log('[API PRODUCTO PUT] Campos de moneda NO existen en BD, usando solo campos básicos')
-        camposMonedaExisten = false
-      } else {
-        console.log('[API PRODUCTO PUT] No se pudo verificar campos de moneda, usando solo campos básicos')
-        camposMonedaExisten = false
-      }
-    }
-    
-    try {
-      await prisma.$queryRawUnsafe(`SELECT "unidadCompra" FROM "producto_proveedor" LIMIT 1`)
-      camposPresentacionExisten = true
-      console.log('[API PRODUCTO PUT] Campos de presentación existen en BD')
-    } catch (error: any) {
-      if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
-        console.log('[API PRODUCTO PUT] Campos de presentación NO existen en BD')
-        camposPresentacionExisten = false
-      } else {
-        camposPresentacionExisten = false
-      }
-    }
-    
-    try {
-      await prisma.$queryRawUnsafe(`SELECT "tipoIVA" FROM "producto_proveedor" LIMIT 1`)
-      camposIVAExisten = true
-      console.log('[API PRODUCTO PUT] Campos de IVA existen en BD')
-    } catch (error: any) {
-      if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
-        console.log('[API PRODUCTO PUT] Campos de IVA NO existen en BD')
-        camposIVAExisten = false
-      } else {
-        camposIVAExisten = false
-      }
-    }
-    
     // Actualizar producto usando transacción
     const producto = await prisma.$transaction(async (tx) => {
-      // Actualizar datos básicos del producto
+      // 1. Actualizar datos básicos del producto
       const productoActualizado = await tx.producto.update({
         where: { id: params.id },
         data: {
           nombre: body.nombre.trim(),
-          codigo: toStringOrNull(body.codigo),
-          descripcion: toStringOrNull(body.descripcion),
-          unidad: body.unidad || productoExistente.unidad,
-          stockMinimo: toNumberOrNull(body.stockMinimo) ?? productoExistente.stockMinimo,
-          rubro: toStringOrNull(body.rubro),
-          activo: body.activo !== undefined ? Boolean(body.activo) : productoExistente.activo,
+          codigo: body.codigo?.trim() || null,
+          descripcion: body.descripcion?.trim() || null,
+          unidad: body.unidad.trim(),
+          stockMinimo: body.stockMinimo ?? 0,
+          rubro: body.rubro?.trim() || null,
+          activo: body.activo !== undefined ? Boolean(body.activo) : true,
         },
       })
 
-      // Si se proporcionan proveedores, actualizar relaciones
-      if (body.proveedores !== undefined && Array.isArray(body.proveedores)) {
-        console.log('[API PRODUCTO PUT] Actualizando proveedores, cantidad:', body.proveedores.length)
-        
-        // Eliminar relaciones existentes
-        await tx.productoProveedor.deleteMany({
-          where: { productoId: params.id },
-        })
-        console.log('[API PRODUCTO PUT] Relaciones anteriores eliminadas')
-
-        // Crear nuevas relaciones
-        if (body.proveedores.length > 0) {
-          // Validar que todos los proveedores existen
-          for (const prov of body.proveedores) {
-            if (!prov.proveedorId) continue
-            const proveedor = await tx.proveedor.findUnique({
-              where: { id: prov.proveedorId },
-              select: { id: true }, // Solo seleccionar el id para evitar errores con columnas que no existen
-            })
-            if (!proveedor) {
-              throw new Error(`Proveedor ${prov.proveedorId} no encontrado`)
-            }
+      // 2. Obtener cotización del dólar si hay productos en USD
+      let cotizacionActual = null
+      const tieneProductosUSD = body.proveedores?.some((p: any) => p.moneda === 'USD')
+      if (tieneProductosUSD) {
+        try {
+          const { obtenerCotizacionBROU } = await import('@/lib/utils')
+          const cotizacionData = await obtenerCotizacionBROU()
+          if (cotizacionData) {
+            cotizacionActual = (cotizacionData.compra + cotizacionData.venta) / 2
           }
-          console.log('[API PRODUCTO PUT] Todos los proveedores validados')
-
-          // Obtener cotización actual del dólar si hay productos en USD
-          let cotizacionActual = null
-          const tieneProductosUSD = body.proveedores.some((p: any) => p.moneda === 'USD')
-          if (tieneProductosUSD) {
-            try {
-              const { obtenerCotizacionBROU } = await import('@/lib/utils')
-              const cotizacionData = await obtenerCotizacionBROU()
-              if (cotizacionData) {
-                cotizacionActual = (cotizacionData.compra + cotizacionData.venta) / 2
-              }
-            } catch (err) {
-              console.warn('[API PRODUCTO PUT] No se pudo obtener cotización:', err)
-            }
-          }
-          
-          // Crear datos con campos de moneda y presentación
-          const datosProveedores = body.proveedores
-            .filter((prov: any) => prov.proveedorId)
-            .map((prov: any, index: number) => {
-              const precioCompra = toNumberOrNull(prov.precioCompra)
-              // Asegurar que la moneda se tome del request, no usar default
-              const moneda = prov.moneda === 'USD' || prov.moneda === 'UYU' ? prov.moneda : 'UYU'
-              let precioEnDolares = null
-              let precioEnPesos = null
-              
-              console.log('[API PRODUCTO PUT] Procesando proveedor:', prov.proveedorId, {
-                monedaRecibida: prov.moneda,
-                monedaFinal: moneda,
-                precioCompra
-              })
-              
-              if (moneda === 'USD' && precioCompra) {
-                precioEnDolares = precioCompra
-                precioEnPesos = cotizacionActual ? precioCompra * cotizacionActual : null
-              } else if (moneda === 'UYU' && precioCompra) {
-                precioEnPesos = precioCompra
-              }
-              
-              return {
-                productoId: params.id,
-                proveedorId: prov.proveedorId,
-                precioCompra,
-                ordenPreferencia: prov.ordenPreferencia || index + 1,
-                moneda,
-                precioEnDolares,
-                precioEnPesos,
-              cotizacionUsada: moneda === 'USD' ? cotizacionActual : null,
-              fechaCotizacion: moneda === 'USD' && cotizacionActual ? new Date() : null,
-              unidadCompra: toStringOrNull(prov.unidadCompra),
-              cantidadPorUnidadCompra: toNumberOrNull(prov.cantidadPorUnidadCompra),
-              tipoIVA: toStringOrNull(prov.tipoIVA),
-              precioIngresadoConIVA: prov.precioIngresadoConIVA !== undefined ? Boolean(prov.precioIngresadoConIVA) : false,
-            }
-          })
-          
-          // Calcular precios con/sin IVA para cada proveedor
-          for (const datosProv of datosProveedores) {
-            if (datosProv.precioCompra && datosProv.tipoIVA) {
-              const ivaDecimal = parseFloat(datosProv.tipoIVA) / 100
-              if (datosProv.precioIngresadoConIVA) {
-                // Precio ingresado incluye IVA
-                datosProv.precioSinIVA = datosProv.precioCompra / (1 + ivaDecimal)
-                datosProv.precioConIVA = datosProv.precioCompra
-              } else {
-                // Precio ingresado sin IVA
-                datosProv.precioSinIVA = datosProv.precioCompra
-                datosProv.precioConIVA = datosProv.precioCompra * (1 + ivaDecimal)
-              }
-            }
-          }
-          
-          console.log('[API PRODUCTO PUT] Creando', datosProveedores.length, 'relaciones de proveedores')
-          
-          // Insertar proveedores según si los campos existen o no (verificado antes de la transacción)
-          for (const datosProv of datosProveedores) {
-            // SOLUCIÓN SIMPLE Y DIRECTA: Normalizar moneda
-            let monedaParaGuardar = 'UYU'
-            if (datosProv.moneda === 'USD' || datosProv.moneda === 'UYU') {
-              monedaParaGuardar = datosProv.moneda
-            } else if (typeof datosProv.moneda === 'string') {
-              const monedaUpper = datosProv.moneda.toUpperCase().trim()
-              if (monedaUpper === 'USD' || monedaUpper === 'UYU') {
-                monedaParaGuardar = monedaUpper
-              }
-            }
-            
-            console.log('[API PRODUCTO PUT] 🔵 MONEDA A GUARDAR:', {
-              proveedorId: datosProv.proveedorId,
-              monedaRecibida: datosProv.moneda,
-              monedaFinal: monedaParaGuardar
-            })
-            
-            console.log('[API PRODUCTO PUT] Guardando proveedor con moneda:', {
-              proveedorId: datosProv.proveedorId,
-              monedaRecibida: datosProv.moneda,
-              monedaParaGuardar: monedaParaGuardar
-            })
-            
-            // Construir SQL dinámicamente según qué campos existen
-            let camposSQL = '"productoId", "proveedorId", "precioCompra", "ordenPreferencia"'
-            let valoresSQL = '$1, $2, $3, $4'
-            let updateSQL = '"precioCompra" = EXCLUDED."precioCompra", "ordenPreferencia" = EXCLUDED."ordenPreferencia"'
-            let params: any[] = [datosProv.productoId, datosProv.proveedorId, datosProv.precioCompra, datosProv.ordenPreferencia]
-            let paramIndex = 5
-            
-            if (camposMonedaExisten) {
-              camposSQL += ', "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion"'
-              valoresSQL += `, $${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}`
-              // CRÍTICO: Usar EXCLUDED."moneda" para tomar el valor del INSERT, no el parámetro
-              updateSQL += `, "moneda" = EXCLUDED."moneda", "precioEnDolares" = EXCLUDED."precioEnDolares", "precioEnPesos" = EXCLUDED."precioEnPesos", "cotizacionUsada" = EXCLUDED."cotizacionUsada", "fechaCotizacion" = EXCLUDED."fechaCotizacion"`
-              params.push(monedaParaGuardar, datosProv.precioEnDolares, datosProv.precioEnPesos, datosProv.cotizacionUsada, datosProv.fechaCotizacion)
-              paramIndex += 5
-            }
-            
-            if (camposPresentacionExisten) {
-              camposSQL += ', "unidadCompra", "cantidadPorUnidadCompra"'
-              valoresSQL += `, $${paramIndex}, $${paramIndex + 1}`
-              updateSQL += ', "unidadCompra" = EXCLUDED."unidadCompra", "cantidadPorUnidadCompra" = EXCLUDED."cantidadPorUnidadCompra"'
-              params.push(datosProv.unidadCompra, datosProv.cantidadPorUnidadCompra)
-              paramIndex += 2
-            }
-            
-            if (camposIVAExisten) {
-              camposSQL += ', "tipoIVA", "precioIngresadoConIVA", "precioConIVA", "precioSinIVA"'
-              valoresSQL += `, $${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}`
-              updateSQL += ', "tipoIVA" = EXCLUDED."tipoIVA", "precioIngresadoConIVA" = EXCLUDED."precioIngresadoConIVA", "precioConIVA" = EXCLUDED."precioConIVA", "precioSinIVA" = EXCLUDED."precioSinIVA"'
-              params.push(datosProv.tipoIVA, datosProv.precioIngresadoConIVA, datosProv.precioConIVA, datosProv.precioSinIVA)
-              paramIndex += 4
-            }
-            
-            const sqlQuery = `
-              INSERT INTO producto_proveedor (id, ${camposSQL}, "createdAt", "updatedAt")
-              VALUES (gen_random_uuid()::text, ${valoresSQL}, NOW(), NOW())
-              ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
-                ${updateSQL},
-                "updatedAt" = NOW()
-            `
-            
-            console.log('[API PRODUCTO PUT] SQL a ejecutar:', sqlQuery)
-            console.log('[API PRODUCTO PUT] Parámetros:', params.map((p, i) => `$${i + 1} = ${p} (${typeof p})`))
-            
-            // PRIMERO: Hacer el INSERT/UPDATE normal
-            await tx.$executeRawUnsafe(sqlQuery, ...params)
-            
-            // SEGUNDO: SIEMPRE hacer UPDATE directo de moneda (esto es lo que realmente funciona)
-            if (camposMonedaExisten) {
-              console.log('[API PRODUCTO PUT] 🔧 EJECUTANDO UPDATE DIRECTO de moneda:', monedaParaGuardar)
-              const updateResult = await tx.$executeRawUnsafe(`
-                UPDATE "producto_proveedor" 
-                SET "moneda" = $1::text
-                WHERE "productoId" = $2 AND "proveedorId" = $3
-              `, monedaParaGuardar, datosProv.productoId, datosProv.proveedorId)
-              console.log('[API PRODUCTO PUT] ✅ UPDATE ejecutado, filas afectadas:', updateResult)
-            }
-            
-            // VERIFICACIÓN CRÍTICA: Leer directamente de la BD qué se guardó
-            const verificarMoneda = await tx.$queryRawUnsafe<Array<{ moneda: string | null }>>(`
-              SELECT "moneda" FROM "producto_proveedor" 
-              WHERE "productoId" = $1 AND "proveedorId" = $2
-            `, datosProv.productoId, datosProv.proveedorId)
-            
-            console.log('[API PRODUCTO PUT] ⚠️ VERIFICACIÓN POST-GUARDADO:', {
-              productoId: datosProv.productoId,
-              proveedorId: datosProv.proveedorId,
-              monedaEnviada: monedaParaGuardar,
-              monedaGuardadaEnBD: verificarMoneda[0]?.moneda,
-              tipoMonedaEnBD: typeof verificarMoneda[0]?.moneda,
-              COINCIDE: verificarMoneda[0]?.moneda === monedaParaGuardar ? '✅ SÍ' : '❌ NO'
-            })
-            
-            // Si no coincide después del UPDATE directo, hay un problema serio
-            if (verificarMoneda[0]?.moneda !== monedaParaGuardar) {
-              console.error('[API PRODUCTO PUT] ❌ ERROR CRÍTICO: Moneda NO se guardó correctamente después de UPDATE directo!', {
-                monedaEnviada: monedaParaGuardar,
-                monedaGuardada: verificarMoneda[0]?.moneda,
-                productoId: datosProv.productoId,
-                proveedorId: datosProv.proveedorId
-              })
-            }
-          }
-          
-          console.log('[API PRODUCTO PUT] Relaciones de proveedores creadas exitosamente')
+        } catch (err) {
+          console.warn('[API PRODUCTO PUT] No se pudo obtener cotización:', err)
         }
       }
 
-      // Retornar producto con proveedores actualizados usando select explícito
+      // 3. Procesar proveedores - SIMPLE Y DIRECTO
+      if (body.proveedores && Array.isArray(body.proveedores) && body.proveedores.length > 0) {
+        for (const prov of body.proveedores) {
+          if (!prov.proveedorId) continue
+
+          // Normalizar moneda - SIMPLE
+          let moneda = 'UYU'
+          if (prov.moneda === 'USD' || prov.moneda === 'UYU') {
+            moneda = prov.moneda
+          }
+
+          // Calcular precios
+          const precioCompra = prov.precioCompra ? Number(prov.precioCompra) : null
+          let precioEnDolares = null
+          let precioEnPesos = null
+
+          if (moneda === 'USD' && precioCompra) {
+            precioEnDolares = precioCompra
+            precioEnPesos = cotizacionActual ? precioCompra * cotizacionActual : null
+          } else if (moneda === 'UYU' && precioCompra) {
+            precioEnPesos = precioCompra
+          }
+
+          // Calcular IVA
+          let precioConIVA = null
+          let precioSinIVA = null
+          if (precioCompra && prov.tipoIVA) {
+            const ivaDecimal = parseFloat(prov.tipoIVA) / 100
+            if (prov.precioIngresadoConIVA) {
+              precioSinIVA = precioCompra / (1 + ivaDecimal)
+              precioConIVA = precioCompra
+            } else {
+              precioSinIVA = precioCompra
+              precioConIVA = precioCompra * (1 + ivaDecimal)
+            }
+          }
+
+          // Usar SQL directo para garantizar que moneda se guarde correctamente
+          try {
+            await tx.$executeRawUnsafe(`
+              INSERT INTO producto_proveedor (
+                id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
+                "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
+                "unidadCompra", "cantidadPorUnidadCompra",
+                "tipoIVA", "precioIngresadoConIVA", "precioConIVA", "precioSinIVA",
+                "createdAt", "updatedAt"
+              )
+              VALUES (
+                gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW()
+              )
+              ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
+                "precioCompra" = EXCLUDED."precioCompra",
+                "ordenPreferencia" = EXCLUDED."ordenPreferencia",
+                "moneda" = EXCLUDED."moneda",
+                "precioEnDolares" = EXCLUDED."precioEnDolares",
+                "precioEnPesos" = EXCLUDED."precioEnPesos",
+                "cotizacionUsada" = EXCLUDED."cotizacionUsada",
+                "fechaCotizacion" = EXCLUDED."fechaCotizacion",
+                "unidadCompra" = EXCLUDED."unidadCompra",
+                "cantidadPorUnidadCompra" = EXCLUDED."cantidadPorUnidadCompra",
+                "tipoIVA" = EXCLUDED."tipoIVA",
+                "precioIngresadoConIVA" = EXCLUDED."precioIngresadoConIVA",
+                "precioConIVA" = EXCLUDED."precioConIVA",
+                "precioSinIVA" = EXCLUDED."precioSinIVA",
+                "updatedAt" = NOW()
+            `,
+              params.id,
+              prov.proveedorId,
+              precioCompra,
+              prov.ordenPreferencia || 1,
+              moneda, // MONEDA SIEMPRE EXPLÍCITA
+              precioEnDolares,
+              precioEnPesos,
+              moneda === 'USD' ? cotizacionActual : null,
+              moneda === 'USD' && cotizacionActual ? new Date() : null,
+              prov.unidadCompra?.trim() || null,
+              prov.cantidadPorUnidadCompra ? Number(prov.cantidadPorUnidadCompra) : null,
+              prov.tipoIVA || null,
+              prov.precioIngresadoConIVA || false,
+              precioConIVA,
+              precioSinIVA
+            )
+          } catch (error: any) {
+            // Si falla por campos que no existen, crear solo con campos básicos + moneda
+            if (error?.code === '42703' || error?.message?.includes('does not exist')) {
+              await tx.$executeRawUnsafe(`
+                INSERT INTO producto_proveedor (
+                  id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
+                  "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
+                  "createdAt", "updatedAt"
+                )
+                VALUES (
+                  gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
+                )
+                ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
+                  "precioCompra" = EXCLUDED."precioCompra",
+                  "ordenPreferencia" = EXCLUDED."ordenPreferencia",
+                  "moneda" = EXCLUDED."moneda",
+                  "precioEnDolares" = EXCLUDED."precioEnDolares",
+                  "precioEnPesos" = EXCLUDED."precioEnPesos",
+                  "cotizacionUsada" = EXCLUDED."cotizacionUsada",
+                  "fechaCotizacion" = EXCLUDED."fechaCotizacion",
+                  "updatedAt" = NOW()
+              `,
+                params.id,
+                prov.proveedorId,
+                precioCompra,
+                prov.ordenPreferencia || 1,
+                moneda, // MONEDA SIEMPRE EXPLÍCITA
+                precioEnDolares,
+                precioEnPesos,
+                moneda === 'USD' ? cotizacionActual : null,
+                moneda === 'USD' && cotizacionActual ? new Date() : null
+              )
+            } else {
+              throw error
+            }
+          }
+          
+          // GARANTÍA FINAL: UPDATE directo de moneda
+          await tx.$executeRawUnsafe(`
+            UPDATE "producto_proveedor" 
+            SET "moneda" = $1::text
+            WHERE "productoId" = $2 AND "proveedorId" = $3
+          `, moneda, params.id, prov.proveedorId)
+        }
+      }
+
+      // 4. Retornar producto actualizado (sin campos adicionales, se leerán después)
       return await tx.producto.findUnique({
         where: { id: params.id },
         select: {
@@ -548,6 +328,8 @@ export async function PUT(
                 select: {
                   id: true,
                   nombre: true,
+                  contacto: true,
+                  telefono: true,
                 },
               },
             },
@@ -567,75 +349,82 @@ export async function PUT(
       })
     })
 
-    console.log('[API PRODUCTO PUT] Producto actualizado exitosamente')
+    // Leer campos adicionales después de la transacción
+    if (producto && producto.proveedores.length > 0) {
+      try {
+        const proveedorIds = producto.proveedores.map(pp => pp.id)
+        const idsList = proveedorIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',')
+        const query = `
+          SELECT 
+            id,
+            "moneda",
+            "precioEnDolares",
+            "precioEnPesos",
+            "cotizacionUsada",
+            "fechaCotizacion",
+            "unidadCompra",
+            "cantidadPorUnidadCompra",
+            "tipoIVA",
+            "precioIngresadoConIVA",
+            "precioConIVA",
+            "precioSinIVA"
+          FROM "producto_proveedor"
+          WHERE id IN (${idsList})
+        `
+        const camposAdicionales = await prisma.$queryRawUnsafe<Array<{
+          id: string
+          moneda?: string | null
+          precioEnDolares?: number | null
+          precioEnPesos?: number | null
+          cotizacionUsada?: number | null
+          fechaCotizacion?: Date | null
+          unidadCompra?: string | null
+          cantidadPorUnidadCompra?: number | null
+          tipoIVA?: string | null
+          precioIngresadoConIVA?: boolean | null
+          precioConIVA?: number | null
+          precioSinIVA?: number | null
+        }>>(query)
+        
+        const camposMap = new Map(camposAdicionales.map(c => [c.id, c]))
+        
+        const productoConCampos = {
+          ...producto,
+          proveedores: producto.proveedores.map(pp => ({
+            ...pp,
+            ...(camposMap.get(pp.id) || {}),
+          })),
+        }
+        
+        return NextResponse.json(productoConCampos)
+      } catch (error) {
+        return NextResponse.json(producto)
+      }
+    }
+    
     return NextResponse.json(producto)
   } catch (error: any) {
-    console.error('[API PRODUCTO PUT] Error completo:', error)
-    console.error('[API PRODUCTO PUT] Error message:', error?.message || String(error))
-    console.error('[API PRODUCTO PUT] Error stack:', error?.stack)
-    console.error('[API PRODUCTO PUT] Error code:', error?.code)
-    console.error('[API PRODUCTO PUT] Error name:', error?.name)
-    
+    console.error('[API PRODUCTO PUT] Error:', error)
     return NextResponse.json(
-      { 
-        error: 'Error al actualizar producto', 
-        details: error?.message || String(error),
-        code: error?.code,
-      },
+      { error: 'Error al actualizar producto' },
       { status: 500 }
     )
   }
 }
 
 // DELETE: Eliminar un producto
-// Si el usuario es ADMIN (dueño): hard delete (eliminación completa)
-// Si no es ADMIN: soft delete (marcar como inactivo)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    // Obtener usuario actual desde la sesión
-    const user = await getCurrentUser()
-    const userIsAdmin = isAdmin(user)
+    await prisma.producto.delete({
+      where: { id: params.id },
+    })
 
-    if (userIsAdmin) {
-      // Hard delete: Eliminar completamente el producto y sus relaciones
-      await prisma.$transaction(async (tx) => {
-        // Eliminar relaciones primero (por las foreign keys)
-        await tx.productoProveedor.deleteMany({
-          where: { productoId: params.id },
-        })
-        await tx.recetaIngrediente.deleteMany({
-          where: { productoId: params.id },
-        })
-        await tx.itemPedido.deleteMany({
-          where: { productoId: params.id },
-        })
-        await tx.inventario.deleteMany({
-          where: { productoId: params.id },
-        })
-
-        // Finalmente eliminar el producto
-        await tx.producto.delete({
-          where: { id: params.id },
-        })
-      })
-
-      return NextResponse.json({ message: 'Producto eliminado permanentemente' })
-    } else {
-      // Soft delete: Marcar como inactivo
-      const producto = await prisma.producto.update({
-        where: { id: params.id },
-        data: {
-          activo: false,
-        },
-      })
-
-      return NextResponse.json(producto)
-    }
+    return NextResponse.json({ message: 'Producto eliminado' })
   } catch (error: any) {
-    console.error('Error en DELETE /api/productos/[id]:', error?.message || String(error))
+    console.error('[API PRODUCTO DELETE] Error:', error)
     return NextResponse.json(
       { error: 'Error al eliminar producto' },
       { status: 500 }

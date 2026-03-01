@@ -13,9 +13,26 @@ export async function GET(
   try {
     const producto = await prisma.producto.findUnique({
       where: { id: params.id },
-      include: {
+      select: {
+        id: true,
+        nombre: true,
+        codigo: true,
+        descripcion: true,
+        unidad: true,
+        stockMinimo: true,
+        rubro: true,
+        activo: true,
+        createdAt: true,
+        updatedAt: true,
         proveedores: {
-          include: {
+          select: {
+            id: true,
+            productoId: true,
+            proveedorId: true,
+            precioCompra: true,
+            ordenPreferencia: true,
+            createdAt: true,
+            updatedAt: true,
             proveedor: {
               select: {
                 id: true,
@@ -29,7 +46,14 @@ export async function GET(
             ordenPreferencia: 'asc',
           },
         },
-        inventario: true,
+        inventario: {
+          select: {
+            id: true,
+            productoId: true,
+            stockActual: true,
+            ultimaActualizacion: true,
+          },
+        },
       },
     })
 
@@ -40,6 +64,59 @@ export async function GET(
       )
     }
 
+    // Leer campos adicionales usando SQL directo
+    if (producto.proveedores.length > 0) {
+      try {
+        const proveedorIds = producto.proveedores.map(pp => pp.id)
+        const idsList = proveedorIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',')
+        const query = `
+          SELECT 
+            id,
+            "moneda",
+            "precioEnDolares",
+            "precioEnPesos",
+            "cotizacionUsada",
+            "fechaCotizacion",
+            "unidadCompra",
+            "cantidadPorUnidadCompra",
+            "tipoIVA",
+            "precioIngresadoConIVA",
+            "precioConIVA",
+            "precioSinIVA"
+          FROM "producto_proveedor"
+          WHERE id IN (${idsList})
+        `
+        const camposAdicionales = await prisma.$queryRawUnsafe<Array<{
+          id: string
+          moneda?: string | null
+          precioEnDolares?: number | null
+          precioEnPesos?: number | null
+          cotizacionUsada?: number | null
+          fechaCotizacion?: Date | null
+          unidadCompra?: string | null
+          cantidadPorUnidadCompra?: number | null
+          tipoIVA?: string | null
+          precioIngresadoConIVA?: boolean | null
+          precioConIVA?: number | null
+          precioSinIVA?: number | null
+        }>>(query)
+        
+        const camposMap = new Map(camposAdicionales.map(c => [c.id, c]))
+        
+        const productoConCampos = {
+          ...producto,
+          proveedores: producto.proveedores.map(pp => ({
+            ...pp,
+            ...(camposMap.get(pp.id) || {}),
+          })),
+        }
+        
+        return NextResponse.json(productoConCampos)
+      } catch (error) {
+        return NextResponse.json(producto)
+      }
+    }
+    
     return NextResponse.json(producto)
   } catch (error: any) {
     console.error('[API PRODUCTO GET] Error:', error)
@@ -133,47 +210,94 @@ export async function PUT(
             }
           }
 
-          // USAR PRISMA.upsert() DIRECTAMENTE - SIMPLE
-          await tx.productoProveedor.upsert({
-            where: {
-              productoId_proveedorId: {
-                productoId: params.id,
-                proveedorId: prov.proveedorId,
-              },
-            },
-            create: {
-              productoId: params.id,
-              proveedorId: prov.proveedorId,
-              precioCompra: precioCompra,
-              ordenPreferencia: prov.ordenPreferencia || 1,
-              moneda: moneda, // SIEMPRE establecer explícitamente
-              precioEnDolares: precioEnDolares,
-              precioEnPesos: precioEnPesos,
-              cotizacionUsada: moneda === 'USD' ? cotizacionActual : null,
-              fechaCotizacion: moneda === 'USD' && cotizacionActual ? new Date() : null,
-              unidadCompra: prov.unidadCompra?.trim() || null,
-              cantidadPorUnidadCompra: prov.cantidadPorUnidadCompra ? Number(prov.cantidadPorUnidadCompra) : null,
-              tipoIVA: prov.tipoIVA || null,
-              precioIngresadoConIVA: prov.precioIngresadoConIVA || false,
-              precioConIVA: precioConIVA,
-              precioSinIVA: precioSinIVA,
-            },
-            update: {
-              precioCompra: precioCompra,
-              ordenPreferencia: prov.ordenPreferencia || 1,
-              moneda: moneda, // SIEMPRE actualizar explícitamente
-              precioEnDolares: precioEnDolares,
-              precioEnPesos: precioEnPesos,
-              cotizacionUsada: moneda === 'USD' ? cotizacionActual : null,
-              fechaCotizacion: moneda === 'USD' && cotizacionActual ? new Date() : null,
-              unidadCompra: prov.unidadCompra?.trim() || null,
-              cantidadPorUnidadCompra: prov.cantidadPorUnidadCompra ? Number(prov.cantidadPorUnidadCompra) : null,
-              tipoIVA: prov.tipoIVA || null,
-              precioIngresadoConIVA: prov.precioIngresadoConIVA || false,
-              precioConIVA: precioConIVA,
-              precioSinIVA: precioSinIVA,
-            },
-          })
+          // Usar SQL directo para garantizar que moneda se guarde correctamente
+          try {
+            await tx.$executeRawUnsafe(`
+              INSERT INTO producto_proveedor (
+                id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
+                "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
+                "unidadCompra", "cantidadPorUnidadCompra",
+                "tipoIVA", "precioIngresadoConIVA", "precioConIVA", "precioSinIVA",
+                "createdAt", "updatedAt"
+              )
+              VALUES (
+                gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW()
+              )
+              ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
+                "precioCompra" = EXCLUDED."precioCompra",
+                "ordenPreferencia" = EXCLUDED."ordenPreferencia",
+                "moneda" = EXCLUDED."moneda",
+                "precioEnDolares" = EXCLUDED."precioEnDolares",
+                "precioEnPesos" = EXCLUDED."precioEnPesos",
+                "cotizacionUsada" = EXCLUDED."cotizacionUsada",
+                "fechaCotizacion" = EXCLUDED."fechaCotizacion",
+                "unidadCompra" = EXCLUDED."unidadCompra",
+                "cantidadPorUnidadCompra" = EXCLUDED."cantidadPorUnidadCompra",
+                "tipoIVA" = EXCLUDED."tipoIVA",
+                "precioIngresadoConIVA" = EXCLUDED."precioIngresadoConIVA",
+                "precioConIVA" = EXCLUDED."precioConIVA",
+                "precioSinIVA" = EXCLUDED."precioSinIVA",
+                "updatedAt" = NOW()
+            `,
+              params.id,
+              prov.proveedorId,
+              precioCompra,
+              prov.ordenPreferencia || 1,
+              moneda, // MONEDA SIEMPRE EXPLÍCITA
+              precioEnDolares,
+              precioEnPesos,
+              moneda === 'USD' ? cotizacionActual : null,
+              moneda === 'USD' && cotizacionActual ? new Date() : null,
+              prov.unidadCompra?.trim() || null,
+              prov.cantidadPorUnidadCompra ? Number(prov.cantidadPorUnidadCompra) : null,
+              prov.tipoIVA || null,
+              prov.precioIngresadoConIVA || false,
+              precioConIVA,
+              precioSinIVA
+            )
+          } catch (error: any) {
+            // Si falla por campos que no existen, crear solo con campos básicos + moneda
+            if (error?.code === '42703' || error?.message?.includes('does not exist')) {
+              await tx.$executeRawUnsafe(`
+                INSERT INTO producto_proveedor (
+                  id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
+                  "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
+                  "createdAt", "updatedAt"
+                )
+                VALUES (
+                  gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
+                )
+                ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
+                  "precioCompra" = EXCLUDED."precioCompra",
+                  "ordenPreferencia" = EXCLUDED."ordenPreferencia",
+                  "moneda" = EXCLUDED."moneda",
+                  "precioEnDolares" = EXCLUDED."precioEnDolares",
+                  "precioEnPesos" = EXCLUDED."precioEnPesos",
+                  "cotizacionUsada" = EXCLUDED."cotizacionUsada",
+                  "fechaCotizacion" = EXCLUDED."fechaCotizacion",
+                  "updatedAt" = NOW()
+              `,
+                params.id,
+                prov.proveedorId,
+                precioCompra,
+                prov.ordenPreferencia || 1,
+                moneda, // MONEDA SIEMPRE EXPLÍCITA
+                precioEnDolares,
+                precioEnPesos,
+                moneda === 'USD' ? cotizacionActual : null,
+                moneda === 'USD' && cotizacionActual ? new Date() : null
+              )
+            } else {
+              throw error
+            }
+          }
+          
+          // GARANTÍA FINAL: UPDATE directo de moneda
+          await tx.$executeRawUnsafe(`
+            UPDATE "producto_proveedor" 
+            SET "moneda" = $1::text
+            WHERE "productoId" = $2 AND "proveedorId" = $3
+          `, moneda, params.id, prov.proveedorId)
 
           console.log('[API PRODUCTO PUT] ✅ Proveedor guardado:', {
             proveedorId: prov.proveedorId,
@@ -182,12 +306,29 @@ export async function PUT(
         }
       }
 
-      // 4. Retornar producto actualizado
+      // 4. Retornar producto actualizado (sin campos adicionales, se leerán después)
       return await tx.producto.findUnique({
         where: { id: params.id },
-        include: {
+        select: {
+          id: true,
+          nombre: true,
+          codigo: true,
+          descripcion: true,
+          unidad: true,
+          stockMinimo: true,
+          rubro: true,
+          activo: true,
+          createdAt: true,
+          updatedAt: true,
           proveedores: {
-            include: {
+            select: {
+              id: true,
+              productoId: true,
+              proveedorId: true,
+              precioCompra: true,
+              ordenPreferencia: true,
+              createdAt: true,
+              updatedAt: true,
               proveedor: {
                 select: {
                   id: true,
@@ -201,11 +342,71 @@ export async function PUT(
               ordenPreferencia: 'asc',
             },
           },
-          inventario: true,
+          inventario: {
+            select: {
+              id: true,
+              productoId: true,
+              stockActual: true,
+              ultimaActualizacion: true,
+            },
+          },
         },
       })
     })
 
+    // Leer campos adicionales después de la transacción
+    if (producto && producto.proveedores.length > 0) {
+      try {
+        const proveedorIds = producto.proveedores.map(pp => pp.id)
+        const idsList = proveedorIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',')
+        const query = `
+          SELECT 
+            id,
+            "moneda",
+            "precioEnDolares",
+            "precioEnPesos",
+            "cotizacionUsada",
+            "fechaCotizacion",
+            "unidadCompra",
+            "cantidadPorUnidadCompra",
+            "tipoIVA",
+            "precioIngresadoConIVA",
+            "precioConIVA",
+            "precioSinIVA"
+          FROM "producto_proveedor"
+          WHERE id IN (${idsList})
+        `
+        const camposAdicionales = await prisma.$queryRawUnsafe<Array<{
+          id: string
+          moneda?: string | null
+          precioEnDolares?: number | null
+          precioEnPesos?: number | null
+          cotizacionUsada?: number | null
+          fechaCotizacion?: Date | null
+          unidadCompra?: string | null
+          cantidadPorUnidadCompra?: number | null
+          tipoIVA?: string | null
+          precioIngresadoConIVA?: boolean | null
+          precioConIVA?: number | null
+          precioSinIVA?: number | null
+        }>>(query)
+        
+        const camposMap = new Map(camposAdicionales.map(c => [c.id, c]))
+        
+        const productoConCampos = {
+          ...producto,
+          proveedores: producto.proveedores.map(pp => ({
+            ...pp,
+            ...(camposMap.get(pp.id) || {}),
+          })),
+        }
+        
+        return NextResponse.json(productoConCampos)
+      } catch (error) {
+        return NextResponse.json(producto)
+      }
+    }
+    
     return NextResponse.json(producto)
   } catch (error: any) {
     console.error('[API PRODUCTO PUT] Error:', error)
