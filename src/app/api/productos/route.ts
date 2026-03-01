@@ -156,6 +156,38 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Verificar qué campos existen ANTES de la transacción
+    let camposMonedaExisten = false
+    let camposPresentacionExisten = false
+    let camposIVAExisten = false
+    
+    try {
+      await prisma.$queryRawUnsafe(`SELECT "moneda" FROM "producto_proveedor" LIMIT 1`)
+      camposMonedaExisten = true
+    } catch (error: any) {
+      if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
+        camposMonedaExisten = false
+      }
+    }
+    
+    try {
+      await prisma.$queryRawUnsafe(`SELECT "unidadCompra" FROM "producto_proveedor" LIMIT 1`)
+      camposPresentacionExisten = true
+    } catch (error: any) {
+      if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
+        camposPresentacionExisten = false
+      }
+    }
+    
+    try {
+      await prisma.$queryRawUnsafe(`SELECT "tipoIVA" FROM "producto_proveedor" LIMIT 1`)
+      camposIVAExisten = true
+    } catch (error: any) {
+      if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
+        camposIVAExisten = false
+      }
+    }
+
     // Crear producto usando transacción
     const producto = await prisma.$transaction(async (tx) => {
       // 1. Crear el producto
@@ -231,62 +263,50 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Usar SQL directo para crear con todos los campos (incluyendo los que pueden no existir)
-          try {
-            await tx.$executeRawUnsafe(`
-              INSERT INTO producto_proveedor (
-                id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
-                "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
-                "unidadCompra", "cantidadPorUnidadCompra",
-                "tipoIVA", "precioIngresadoConIVA", "precioConIVA", "precioSinIVA",
-                "createdAt", "updatedAt"
-              )
-              VALUES (
-                gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW()
-              )
-            `,
-              nuevoProducto.id,
-              prov.proveedorId,
-              precioCompra,
-              prov.ordenPreferencia || 1,
-              moneda, // MONEDA SIEMPRE EXPLÍCITA
-              precioEnDolares,
-              precioEnPesos,
-              moneda === 'USD' ? cotizacionActual : null,
-              moneda === 'USD' && cotizacionActual ? new Date() : null,
-              prov.unidadCompra?.trim() || null,
-              prov.cantidadPorUnidadCompra ? Number(prov.cantidadPorUnidadCompra) : null,
-              prov.tipoIVA || null,
-              prov.precioIngresadoConIVA || false,
-              precioConIVA,
-              precioSinIVA
+          // Construir SQL dinámicamente según qué campos existen
+          let camposSQL = '"productoId", "proveedorId", "precioCompra", "ordenPreferencia"'
+          let valoresSQL = '$1, $2, $3, $4'
+          let params: any[] = [nuevoProducto.id, prov.proveedorId, precioCompra, prov.ordenPreferencia || 1]
+          let paramIndex = 5
+
+          if (camposMonedaExisten) {
+            camposSQL += ', "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion"'
+            valoresSQL += `, $${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}`
+            params.push(moneda, precioEnDolares, precioEnPesos, moneda === 'USD' ? cotizacionActual : null, moneda === 'USD' && cotizacionActual ? new Date() : null)
+            paramIndex += 5
+          }
+
+          if (camposPresentacionExisten) {
+            camposSQL += ', "unidadCompra", "cantidadPorUnidadCompra"'
+            valoresSQL += `, $${paramIndex}, $${paramIndex + 1}`
+            params.push(prov.unidadCompra?.trim() || null, prov.cantidadPorUnidadCompra ? Number(prov.cantidadPorUnidadCompra) : null)
+            paramIndex += 2
+          }
+
+          if (camposIVAExisten) {
+            camposSQL += ', "tipoIVA", "precioIngresadoConIVA", "precioConIVA", "precioSinIVA"'
+            valoresSQL += `, $${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}`
+            params.push(prov.tipoIVA || null, prov.precioIngresadoConIVA || false, precioConIVA, precioSinIVA)
+            paramIndex += 4
+          }
+
+          // INSERT solo con campos que existen
+          await tx.$executeRawUnsafe(`
+            INSERT INTO producto_proveedor (
+              id, ${camposSQL}, "createdAt", "updatedAt"
             )
-          } catch (error: any) {
-            // Si falla por campos que no existen, crear solo con campos básicos + moneda
-            if (error?.code === '42703' || error?.message?.includes('does not exist')) {
-              await tx.$executeRawUnsafe(`
-                INSERT INTO producto_proveedor (
-                  id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
-                  "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
-                  "createdAt", "updatedAt"
-                )
-                VALUES (
-                  gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
-                )
-              `,
-                nuevoProducto.id,
-                prov.proveedorId,
-                precioCompra,
-                prov.ordenPreferencia || 1,
-                moneda, // MONEDA SIEMPRE EXPLÍCITA
-                precioEnDolares,
-                precioEnPesos,
-                moneda === 'USD' ? cotizacionActual : null,
-                moneda === 'USD' && cotizacionActual ? new Date() : null
-              )
-            } else {
-              throw error
-            }
+            VALUES (
+              gen_random_uuid()::text, ${valoresSQL}, NOW(), NOW()
+            )
+          `, ...params)
+
+          // GARANTÍA FINAL: UPDATE directo de moneda si existe
+          if (camposMonedaExisten) {
+            await tx.$executeRawUnsafe(`
+              UPDATE "producto_proveedor" 
+              SET "moneda" = $1::text
+              WHERE "productoId" = $2 AND "proveedorId" = $3
+            `, moneda, nuevoProducto.id, prov.proveedorId)
           }
 
           console.log('[API PRODUCTOS POST] ✅ Proveedor creado:', {
