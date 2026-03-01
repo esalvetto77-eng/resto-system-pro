@@ -490,6 +490,16 @@ export async function PUT(
             
             await tx.$executeRawUnsafe(sqlQuery, ...params)
             
+            // SOLUCIÓN DEFINITIVA: SIEMPRE hacer UPDATE directo de moneda después de INSERT/UPDATE
+            if (camposMonedaExisten) {
+              console.log('[API PRODUCTO PUT] 🔧 UPDATE DIRECTO de moneda:', monedaParaGuardar)
+              await tx.$executeRawUnsafe(`
+                UPDATE "producto_proveedor" 
+                SET "moneda" = $1 
+                WHERE "productoId" = $2 AND "proveedorId" = $3
+              `, monedaParaGuardar, datosProv.productoId, datosProv.proveedorId)
+            }
+            
             // VERIFICACIÓN CRÍTICA: Leer directamente de la BD qué se guardó
             const verificarMoneda = await tx.$queryRawUnsafe<Array<{ moneda: string | null }>>(`
               SELECT "moneda" FROM "producto_proveedor" 
@@ -505,24 +515,13 @@ export async function PUT(
               COINCIDE: verificarMoneda[0]?.moneda === monedaParaGuardar ? '✅ SÍ' : '❌ NO'
             })
             
-            // Si no coincide, hacer UPDATE directo como último recurso
-            if (verificarMoneda[0]?.moneda !== monedaParaGuardar && camposMonedaExisten) {
-              console.log('[API PRODUCTO PUT] ⚠️ MONEDA NO COINCIDE - Haciendo UPDATE directo...')
-              await tx.$executeRawUnsafe(`
-                UPDATE "producto_proveedor" 
-                SET "moneda" = $1 
-                WHERE "productoId" = $2 AND "proveedorId" = $3
-              `, monedaParaGuardar, datosProv.productoId, datosProv.proveedorId)
-              
-              // Verificar de nuevo
-              const verificarMoneda2 = await tx.$queryRawUnsafe<Array<{ moneda: string | null }>>(`
-                SELECT "moneda" FROM "producto_proveedor" 
-                WHERE "productoId" = $1 AND "proveedorId" = $2
-              `, datosProv.productoId, datosProv.proveedorId)
-              
-              console.log('[API PRODUCTO PUT] ✅ Verificación después de UPDATE directo:', {
-                monedaGuardada: verificarMoneda2[0]?.moneda,
-                COINCIDE: verificarMoneda2[0]?.moneda === monedaParaGuardar ? '✅ SÍ' : '❌ NO'
+            // Si no coincide después del UPDATE directo, hay un problema serio
+            if (verificarMoneda[0]?.moneda !== monedaParaGuardar) {
+              console.error('[API PRODUCTO PUT] ❌ ERROR CRÍTICO: Moneda NO se guardó correctamente después de UPDATE directo!', {
+                monedaEnviada: monedaParaGuardar,
+                monedaGuardada: verificarMoneda[0]?.moneda,
+                productoId: datosProv.productoId,
+                proveedorId: datosProv.proveedorId
               })
             }
           }
