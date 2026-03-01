@@ -1,29 +1,18 @@
-// API Route para Productos - REESCRITO DESDE CERO
+// API Route para operaciones individuales de Productos - REESCRITO DESDE CERO
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// GET: Listar todos los productos
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const soloActivos = searchParams.get('activo') === 'true'
-  const proveedorId = searchParams.get('proveedorId')
-  
+// GET: Obtener un producto por ID
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    const whereClause: any = soloActivos ? { activo: true } : {}
-    
-    if (proveedorId) {
-      whereClause.proveedores = {
-        some: {
-          proveedorId: proveedorId
-        }
-      }
-    }
-    
-    const productos = await prisma.producto.findMany({
-      where: whereClause,
+    const producto = await prisma.producto.findUnique({
+      where: { id: params.id },
       include: {
         proveedores: {
           include: {
@@ -42,23 +31,30 @@ export async function GET(request: NextRequest) {
         },
         inventario: true,
       },
-      orderBy: {
-        nombre: 'asc',
-      },
     })
 
-    return NextResponse.json(productos)
+    if (!producto) {
+      return NextResponse.json(
+        { error: 'Producto no encontrado' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json(producto)
   } catch (error: any) {
-    console.error('[API PRODUCTOS GET] Error:', error)
+    console.error('[API PRODUCTO GET] Error:', error)
     return NextResponse.json(
-      { error: 'Error al obtener productos' },
+      { error: 'Error al obtener producto' },
       { status: 500 }
     )
   }
 }
 
-// POST: Crear un nuevo producto
-export async function POST(request: NextRequest) {
+// PUT: Actualizar un producto
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const body = await request.json()
 
@@ -69,17 +65,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!body.unidad || typeof body.unidad !== 'string' || body.unidad.trim() === '') {
-      return NextResponse.json(
-        { error: 'La unidad es requerida' },
-        { status: 400 }
-      )
-    }
-
-    // Crear producto usando transacción
+    // Actualizar producto usando transacción
     const producto = await prisma.$transaction(async (tx) => {
-      // 1. Crear el producto
-      const nuevoProducto = await tx.producto.create({
+      // 1. Actualizar datos básicos del producto
+      const productoActualizado = await tx.producto.update({
+        where: { id: params.id },
         data: {
           nombre: body.nombre.trim(),
           codigo: body.codigo?.trim() || null,
@@ -91,15 +81,7 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // 2. Crear registro de inventario inicial
-      await tx.inventario.create({
-        data: {
-          productoId: nuevoProducto.id,
-          stockActual: body.stockInicial ?? 0,
-        },
-      })
-
-      // 3. Obtener cotización del dólar si hay productos en USD
+      // 2. Obtener cotización del dólar si hay productos en USD
       let cotizacionActual = null
       const tieneProductosUSD = body.proveedores?.some((p: any) => p.moneda === 'USD')
       if (tieneProductosUSD) {
@@ -110,11 +92,11 @@ export async function POST(request: NextRequest) {
             cotizacionActual = (cotizacionData.compra + cotizacionData.venta) / 2
           }
         } catch (err) {
-          console.warn('[API PRODUCTOS POST] No se pudo obtener cotización:', err)
+          console.warn('[API PRODUCTO PUT] No se pudo obtener cotización:', err)
         }
       }
 
-      // 4. Procesar proveedores - SIMPLE Y DIRECTO
+      // 3. Procesar proveedores - SIMPLE Y DIRECTO
       if (body.proveedores && Array.isArray(body.proveedores) && body.proveedores.length > 0) {
         for (const prov of body.proveedores) {
           if (!prov.proveedorId) continue
@@ -151,10 +133,16 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // USAR PRISMA.create() DIRECTAMENTE - SIMPLE
-          await tx.productoProveedor.create({
-            data: {
-              productoId: nuevoProducto.id,
+          // USAR PRISMA.upsert() DIRECTAMENTE - SIMPLE
+          await tx.productoProveedor.upsert({
+            where: {
+              productoId_proveedorId: {
+                productoId: params.id,
+                proveedorId: prov.proveedorId,
+              },
+            },
+            create: {
+              productoId: params.id,
               proveedorId: prov.proveedorId,
               precioCompra: precioCompra,
               ordenPreferencia: prov.ordenPreferencia || 1,
@@ -170,18 +158,33 @@ export async function POST(request: NextRequest) {
               precioConIVA: precioConIVA,
               precioSinIVA: precioSinIVA,
             },
+            update: {
+              precioCompra: precioCompra,
+              ordenPreferencia: prov.ordenPreferencia || 1,
+              moneda: moneda, // SIEMPRE actualizar explícitamente
+              precioEnDolares: precioEnDolares,
+              precioEnPesos: precioEnPesos,
+              cotizacionUsada: moneda === 'USD' ? cotizacionActual : null,
+              fechaCotizacion: moneda === 'USD' && cotizacionActual ? new Date() : null,
+              unidadCompra: prov.unidadCompra?.trim() || null,
+              cantidadPorUnidadCompra: prov.cantidadPorUnidadCompra ? Number(prov.cantidadPorUnidadCompra) : null,
+              tipoIVA: prov.tipoIVA || null,
+              precioIngresadoConIVA: prov.precioIngresadoConIVA || false,
+              precioConIVA: precioConIVA,
+              precioSinIVA: precioSinIVA,
+            },
           })
 
-          console.log('[API PRODUCTOS POST] ✅ Proveedor creado:', {
+          console.log('[API PRODUCTO PUT] ✅ Proveedor guardado:', {
             proveedorId: prov.proveedorId,
             moneda: moneda
           })
         }
       }
 
-      // 5. Retornar producto creado
+      // 4. Retornar producto actualizado
       return await tx.producto.findUnique({
-        where: { id: nuevoProducto.id },
+        where: { id: params.id },
         include: {
           proveedores: {
             include: {
@@ -203,11 +206,31 @@ export async function POST(request: NextRequest) {
       })
     })
 
-    return NextResponse.json(producto, { status: 201 })
+    return NextResponse.json(producto)
   } catch (error: any) {
-    console.error('[API PRODUCTOS POST] Error:', error)
+    console.error('[API PRODUCTO PUT] Error:', error)
     return NextResponse.json(
-      { error: 'Error al crear producto' },
+      { error: 'Error al actualizar producto' },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE: Eliminar un producto
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await prisma.producto.delete({
+      where: { id: params.id },
+    })
+
+    return NextResponse.json({ message: 'Producto eliminado' })
+  } catch (error: any) {
+    console.error('[API PRODUCTO DELETE] Error:', error)
+    return NextResponse.json(
+      { error: 'Error al eliminar producto' },
       { status: 500 }
     )
   }
