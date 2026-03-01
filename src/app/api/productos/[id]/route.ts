@@ -436,161 +436,122 @@ export async function PUT(
             })
             
             if (camposMonedaExisten && camposPresentacionExisten && camposIVAExisten) {
+              // SOLUCIÓN EFICAZ: Usar Prisma.upsert() directamente - más confiable que SQL crudo
+              const monedaParaGuardar: string = monedaFinal || 'UYU'
               
-              // Insertar con todos los campos incluyendo IVA
-              // Asegurar que monedaFinal sea siempre un string válido, nunca null
-              const monedaParaSQL: string = monedaFinal || 'UYU'
-              
-              console.log('[API PRODUCTO PUT] Ejecutando INSERT con moneda:', {
+              console.log('[API PRODUCTO PUT] Usando Prisma.upsert con moneda:', {
                 proveedorId: datosProv.proveedorId,
                 monedaFinal: monedaFinal,
-                monedaParaSQL: monedaParaSQL,
-                tipo: typeof monedaParaSQL
+                monedaParaGuardar: monedaParaGuardar,
+                tipo: typeof monedaParaGuardar
               })
               
-              await tx.$executeRawUnsafe(`
-                INSERT INTO producto_proveedor (
-                  id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
-                  "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
-                  "unidadCompra", "cantidadPorUnidadCompra",
-                  "tipoIVA", "precioIngresadoConIVA", "precioConIVA", "precioSinIVA",
-                  "createdAt", "updatedAt"
-                )
-                VALUES (
-                  gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW()
-                )
-                ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
-                  "precioCompra" = EXCLUDED."precioCompra",
-                  "ordenPreferencia" = EXCLUDED."ordenPreferencia",
-                  "moneda" = $5,
-                  "precioEnDolares" = EXCLUDED."precioEnDolares",
-                  "precioEnPesos" = EXCLUDED."precioEnPesos",
-                  "cotizacionUsada" = EXCLUDED."cotizacionUsada",
-                  "fechaCotizacion" = EXCLUDED."fechaCotizacion",
-                  "unidadCompra" = EXCLUDED."unidadCompra",
-                  "cantidadPorUnidadCompra" = EXCLUDED."cantidadPorUnidadCompra",
-                  "tipoIVA" = EXCLUDED."tipoIVA",
-                  "precioIngresadoConIVA" = EXCLUDED."precioIngresadoConIVA",
-                  "precioConIVA" = EXCLUDED."precioConIVA",
-                  "precioSinIVA" = EXCLUDED."precioSinIVA",
-                  "updatedAt" = NOW()
-              `,
-                datosProv.productoId,
-                datosProv.proveedorId,
-                datosProv.precioCompra,
-                datosProv.ordenPreferencia,
-                monedaParaSQL, // Asegurar que siempre sea string válido
-                datosProv.precioEnDolares,
-                datosProv.precioEnPesos,
-                datosProv.cotizacionUsada,
-                datosProv.fechaCotizacion,
-                datosProv.unidadCompra,
-                datosProv.cantidadPorUnidadCompra,
-                datosProv.tipoIVA,
-                datosProv.precioIngresadoConIVA,
-                datosProv.precioConIVA,
-                datosProv.precioSinIVA
-              )
+              await tx.productoProveedor.upsert({
+                where: {
+                  productoId_proveedorId: {
+                    productoId: datosProv.productoId,
+                    proveedorId: datosProv.proveedorId,
+                  },
+                },
+                create: {
+                  productoId: datosProv.productoId,
+                  proveedorId: datosProv.proveedorId,
+                  precioCompra: datosProv.precioCompra,
+                  ordenPreferencia: datosProv.ordenPreferencia,
+                  moneda: monedaParaGuardar, // Prisma manejará esto correctamente
+                  precioEnDolares: datosProv.precioEnDolares,
+                  precioEnPesos: datosProv.precioEnPesos,
+                  cotizacionUsada: datosProv.cotizacionUsada,
+                  fechaCotizacion: datosProv.fechaCotizacion,
+                  unidadCompra: datosProv.unidadCompra,
+                  cantidadPorUnidadCompra: datosProv.cantidadPorUnidadCompra,
+                  tipoIVA: datosProv.tipoIVA,
+                  precioIngresadoConIVA: datosProv.precioIngresadoConIVA,
+                  precioConIVA: datosProv.precioConIVA,
+                  precioSinIVA: datosProv.precioSinIVA,
+                },
+                update: {
+                  precioCompra: datosProv.precioCompra,
+                  ordenPreferencia: datosProv.ordenPreferencia,
+                  moneda: monedaParaGuardar, // Asegurar que se actualice siempre
+                  precioEnDolares: datosProv.precioEnDolares,
+                  precioEnPesos: datosProv.precioEnPesos,
+                  cotizacionUsada: datosProv.cotizacionUsada,
+                  fechaCotizacion: datosProv.fechaCotizacion,
+                  unidadCompra: datosProv.unidadCompra,
+                  cantidadPorUnidadCompra: datosProv.cantidadPorUnidadCompra,
+                  tipoIVA: datosProv.tipoIVA,
+                  precioIngresadoConIVA: datosProv.precioIngresadoConIVA,
+                  precioConIVA: datosProv.precioConIVA,
+                  precioSinIVA: datosProv.precioSinIVA,
+                },
+              })
               
-              // Verificar qué se guardó realmente
-              const verificarGuardado = await tx.$queryRawUnsafe<Array<{ moneda: string | null }>>(`
-                SELECT "moneda" FROM "producto_proveedor" 
-                WHERE "productoId" = $1 AND "proveedorId" = $2
-              `, datosProv.productoId, datosProv.proveedorId)
+              // Verificar qué se guardó realmente usando Prisma
+              const verificarGuardado = await tx.productoProveedor.findUnique({
+                where: {
+                  productoId_proveedorId: {
+                    productoId: datosProv.productoId,
+                    proveedorId: datosProv.proveedorId,
+                  },
+                },
+                select: { moneda: true },
+              })
               
-              console.log('[API PRODUCTO PUT] Verificación post-INSERT:', {
+              console.log('[API PRODUCTO PUT] Verificación post-UPSERT:', {
                 productoId: datosProv.productoId,
                 proveedorId: datosProv.proveedorId,
                 monedaEnviada: monedaFinal,
-                monedaGuardadaEnBD: verificarGuardado[0]?.moneda,
-                tipoMonedaEnBD: typeof verificarGuardado[0]?.moneda
+                monedaGuardadaEnBD: verificarGuardado?.moneda,
+                tipoMonedaEnBD: typeof verificarGuardado?.moneda
               })
-            } else if (camposMonedaExisten && camposPresentacionExisten) {
-              // Insertar con campos de moneda y presentación pero sin IVA
-              const monedaParaSQL: string = monedaFinal || 'UYU'
-              
-              await tx.$executeRawUnsafe(`
-                INSERT INTO producto_proveedor (
-                  id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
-                  "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
-                  "unidadCompra", "cantidadPorUnidadCompra",
-                  "createdAt", "updatedAt"
-                )
-                VALUES (
-                  gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW()
-                )
-                ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
-                  "precioCompra" = EXCLUDED."precioCompra",
-                  "ordenPreferencia" = EXCLUDED."ordenPreferencia",
-                  "moneda" = $5,
-                  "precioEnDolares" = EXCLUDED."precioEnDolares",
-                  "precioEnPesos" = EXCLUDED."precioEnPesos",
-                  "cotizacionUsada" = EXCLUDED."cotizacionUsada",
-                  "fechaCotizacion" = EXCLUDED."fechaCotizacion",
-                  "unidadCompra" = EXCLUDED."unidadCompra",
-                  "cantidadPorUnidadCompra" = EXCLUDED."cantidadPorUnidadCompra",
-                  "updatedAt" = NOW()
-              `,
-                datosProv.productoId,
-                datosProv.proveedorId,
-                datosProv.precioCompra,
-                datosProv.ordenPreferencia,
-                monedaParaSQL,
-                datosProv.precioEnDolares,
-                datosProv.precioEnPesos,
-                datosProv.cotizacionUsada,
-                datosProv.fechaCotizacion,
-                datosProv.unidadCompra,
-                datosProv.cantidadPorUnidadCompra
-              )
-            } else if (camposMonedaExisten) {
-              // Insertar con campos de moneda pero sin presentación
-              const monedaParaSQL: string = monedaFinal || 'UYU'
-              
-              await tx.$executeRawUnsafe(`
-                INSERT INTO producto_proveedor (
-                  id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
-                  "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion",
-                  "createdAt", "updatedAt"
-                )
-                VALUES (
-                  gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
-                )
-                ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
-                  "precioCompra" = EXCLUDED."precioCompra",
-                  "ordenPreferencia" = EXCLUDED."ordenPreferencia",
-                  "moneda" = $5,
-                  "precioEnDolares" = EXCLUDED."precioEnDolares",
-                  "precioEnPesos" = EXCLUDED."precioEnPesos",
-                  "cotizacionUsada" = EXCLUDED."cotizacionUsada",
-                  "fechaCotizacion" = EXCLUDED."fechaCotizacion",
-                  "updatedAt" = NOW()
-              `,
-                datosProv.productoId,
-                datosProv.proveedorId,
-                datosProv.precioCompra,
-                datosProv.ordenPreferencia,
-                monedaParaSQL,
-                datosProv.precioEnDolares,
-                datosProv.precioEnPesos,
-                datosProv.cotizacionUsada,
-                datosProv.fechaCotizacion
-              )
             } else {
-              // Insertar solo campos básicos
-              await tx.$executeRawUnsafe(`
-                INSERT INTO producto_proveedor (id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia", "createdAt", "updatedAt")
-                VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW(), NOW())
-                ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
-                  "precioCompra" = EXCLUDED."precioCompra",
-                  "ordenPreferencia" = EXCLUDED."ordenPreferencia",
-                  "updatedAt" = NOW()
-              `,
-                datosProv.productoId,
-                datosProv.proveedorId,
-                datosProv.precioCompra,
-                datosProv.ordenPreferencia
-              )
+              // SOLUCIÓN EFICAZ: Usar Prisma.upsert() para todos los casos - más confiable
+              // Si las columnas no existen, Prisma las omitirá automáticamente
+              const monedaParaGuardar: string = monedaFinal || 'UYU'
+              
+              const dataToUpsert: any = {
+                precioCompra: datosProv.precioCompra,
+                ordenPreferencia: datosProv.ordenPreferencia,
+                moneda: monedaParaGuardar, // SIEMPRE incluir moneda
+              }
+              
+              // Agregar campos opcionales solo si existen
+              if (camposMonedaExisten) {
+                dataToUpsert.precioEnDolares = datosProv.precioEnDolares
+                dataToUpsert.precioEnPesos = datosProv.precioEnPesos
+                dataToUpsert.cotizacionUsada = datosProv.cotizacionUsada
+                dataToUpsert.fechaCotizacion = datosProv.fechaCotizacion
+              }
+              
+              if (camposPresentacionExisten) {
+                dataToUpsert.unidadCompra = datosProv.unidadCompra
+                dataToUpsert.cantidadPorUnidadCompra = datosProv.cantidadPorUnidadCompra
+              }
+              
+              if (camposIVAExisten) {
+                dataToUpsert.tipoIVA = datosProv.tipoIVA
+                dataToUpsert.precioIngresadoConIVA = datosProv.precioIngresadoConIVA
+                dataToUpsert.precioConIVA = datosProv.precioConIVA
+                dataToUpsert.precioSinIVA = datosProv.precioSinIVA
+              }
+              
+              await tx.productoProveedor.upsert({
+                where: {
+                  productoId_proveedorId: {
+                    productoId: datosProv.productoId,
+                    proveedorId: datosProv.proveedorId,
+                  },
+                },
+                create: {
+                  productoId: datosProv.productoId,
+                  proveedorId: datosProv.proveedorId,
+                  ...dataToUpsert,
+                },
+                update: dataToUpsert,
+              })
+              
+              console.log('[API PRODUCTO PUT] Upsert completado con moneda:', monedaParaGuardar)
             }
           }
           
