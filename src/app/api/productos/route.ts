@@ -430,6 +430,15 @@ export async function POST(request: NextRequest) {
           })
           
           if (camposMonedaExisten && camposPresentacionExisten && camposIVAExisten) {
+            // Asegurar que monedaFinal sea siempre un string válido, nunca null
+            const monedaParaSQL: string = monedaFinal || 'UYU'
+            
+            console.log('[API PRODUCTOS POST] Ejecutando INSERT con moneda:', {
+              proveedorId: datosProv.proveedorId,
+              monedaFinal: monedaFinal,
+              monedaParaSQL: monedaParaSQL,
+              tipo: typeof monedaParaSQL
+            })
             
             // Insertar con todos los campos incluyendo IVA
             await tx.$executeRawUnsafe(`
@@ -446,7 +455,7 @@ export async function POST(request: NextRequest) {
               ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
                 "precioCompra" = EXCLUDED."precioCompra",
                 "ordenPreferencia" = EXCLUDED."ordenPreferencia",
-                "moneda" = EXCLUDED."moneda",
+                "moneda" = $5,
                 "precioEnDolares" = EXCLUDED."precioEnDolares",
                 "precioEnPesos" = EXCLUDED."precioEnPesos",
                 "cotizacionUsada" = EXCLUDED."cotizacionUsada",
@@ -463,7 +472,7 @@ export async function POST(request: NextRequest) {
               datosProv.proveedorId,
               datosProv.precioCompra,
               datosProv.ordenPreferencia,
-              monedaFinal, // Usar monedaFinal validada
+              monedaParaSQL, // Asegurar que siempre sea string válido
               datosProv.precioEnDolares,
               datosProv.precioEnPesos,
               datosProv.cotizacionUsada,

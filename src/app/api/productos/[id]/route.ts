@@ -438,6 +438,16 @@ export async function PUT(
             if (camposMonedaExisten && camposPresentacionExisten && camposIVAExisten) {
               
               // Insertar con todos los campos incluyendo IVA
+              // Asegurar que monedaFinal sea siempre un string válido, nunca null
+              const monedaParaSQL: string = monedaFinal || 'UYU'
+              
+              console.log('[API PRODUCTO PUT] Ejecutando INSERT con moneda:', {
+                proveedorId: datosProv.proveedorId,
+                monedaFinal: monedaFinal,
+                monedaParaSQL: monedaParaSQL,
+                tipo: typeof monedaParaSQL
+              })
+              
               await tx.$executeRawUnsafe(`
                 INSERT INTO producto_proveedor (
                   id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
@@ -452,7 +462,7 @@ export async function PUT(
                 ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
                   "precioCompra" = EXCLUDED."precioCompra",
                   "ordenPreferencia" = EXCLUDED."ordenPreferencia",
-                  "moneda" = EXCLUDED."moneda",
+                  "moneda" = $5,
                   "precioEnDolares" = EXCLUDED."precioEnDolares",
                   "precioEnPesos" = EXCLUDED."precioEnPesos",
                   "cotizacionUsada" = EXCLUDED."cotizacionUsada",
@@ -469,7 +479,7 @@ export async function PUT(
                 datosProv.proveedorId,
                 datosProv.precioCompra,
                 datosProv.ordenPreferencia,
-                monedaFinal, // Usar monedaFinal validada
+                monedaParaSQL, // Asegurar que siempre sea string válido
                 datosProv.precioEnDolares,
                 datosProv.precioEnPesos,
                 datosProv.cotizacionUsada,
@@ -497,6 +507,8 @@ export async function PUT(
               })
             } else if (camposMonedaExisten && camposPresentacionExisten) {
               // Insertar con campos de moneda y presentación pero sin IVA
+              const monedaParaSQL: string = monedaFinal || 'UYU'
+              
               await tx.$executeRawUnsafe(`
                 INSERT INTO producto_proveedor (
                   id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
@@ -510,7 +522,7 @@ export async function PUT(
                 ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
                   "precioCompra" = EXCLUDED."precioCompra",
                   "ordenPreferencia" = EXCLUDED."ordenPreferencia",
-                  "moneda" = EXCLUDED."moneda",
+                  "moneda" = $5,
                   "precioEnDolares" = EXCLUDED."precioEnDolares",
                   "precioEnPesos" = EXCLUDED."precioEnPesos",
                   "cotizacionUsada" = EXCLUDED."cotizacionUsada",
@@ -523,7 +535,7 @@ export async function PUT(
                 datosProv.proveedorId,
                 datosProv.precioCompra,
                 datosProv.ordenPreferencia,
-                monedaFinal, // Usar monedaFinal validada
+                monedaParaSQL,
                 datosProv.precioEnDolares,
                 datosProv.precioEnPesos,
                 datosProv.cotizacionUsada,
@@ -533,6 +545,8 @@ export async function PUT(
               )
             } else if (camposMonedaExisten) {
               // Insertar con campos de moneda pero sin presentación
+              const monedaParaSQL: string = monedaFinal || 'UYU'
+              
               await tx.$executeRawUnsafe(`
                 INSERT INTO producto_proveedor (
                   id, "productoId", "proveedorId", "precioCompra", "ordenPreferencia",
@@ -545,7 +559,7 @@ export async function PUT(
                 ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
                   "precioCompra" = EXCLUDED."precioCompra",
                   "ordenPreferencia" = EXCLUDED."ordenPreferencia",
-                  "moneda" = EXCLUDED."moneda",
+                  "moneda" = $5,
                   "precioEnDolares" = EXCLUDED."precioEnDolares",
                   "precioEnPesos" = EXCLUDED."precioEnPesos",
                   "cotizacionUsada" = EXCLUDED."cotizacionUsada",
@@ -556,7 +570,7 @@ export async function PUT(
                 datosProv.proveedorId,
                 datosProv.precioCompra,
                 datosProv.ordenPreferencia,
-                monedaFinal, // Usar monedaFinal
+                monedaParaSQL,
                 datosProv.precioEnDolares,
                 datosProv.precioEnPesos,
                 datosProv.cotizacionUsada,

@@ -127,7 +127,14 @@ export default function NuevoProductoPage() {
     } else if (field === 'cantidadPorUnidadCompra') {
       nuevos[index].cantidadPorUnidadCompra = value === '' ? null : Number(value)
     } else if (field === 'moneda') {
-      nuevos[index].moneda = value as 'USD' | 'UYU'
+      // Asegurar que la moneda sea 'USD' o 'UYU' exactamente
+      const monedaValue = typeof value === 'string' ? value.trim().toUpperCase() : 'UYU'
+      nuevos[index].moneda = (monedaValue === 'USD' || monedaValue === 'UYU') ? monedaValue : 'UYU'
+      console.log('[NUEVO PRODUCTO] Moneda actualizada:', {
+        index,
+        valorRecibido: value,
+        valorFinal: nuevos[index].moneda
+      })
     } else if (field === 'unidadCompra') {
       nuevos[index].unidadCompra = value as string
     } else if (field === 'tipoIVA') {
