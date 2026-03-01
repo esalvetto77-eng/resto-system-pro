@@ -442,12 +442,15 @@ export async function POST(request: NextRequest) {
           // Construir SQL dinámicamente según qué campos existen
           let camposSQL = '"productoId", "proveedorId", "precioCompra", "ordenPreferencia"'
           let valoresSQL = '$1, $2, $3, $4'
+          let updateSQL = '"precioCompra" = EXCLUDED."precioCompra", "ordenPreferencia" = EXCLUDED."ordenPreferencia"'
           let params: any[] = [datosProv.productoId, datosProv.proveedorId, datosProv.precioCompra, datosProv.ordenPreferencia]
           let paramIndex = 5
           
           if (camposMonedaExisten) {
             camposSQL += ', "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion"'
             valoresSQL += `, $${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}`
+            // CRÍTICO: Usar EXCLUDED."moneda" para tomar el valor del INSERT
+            updateSQL += `, "moneda" = EXCLUDED."moneda", "precioEnDolares" = EXCLUDED."precioEnDolares", "precioEnPesos" = EXCLUDED."precioEnPesos", "cotizacionUsada" = EXCLUDED."cotizacionUsada", "fechaCotizacion" = EXCLUDED."fechaCotizacion"`
             params.push(monedaParaGuardar, datosProv.precioEnDolares, datosProv.precioEnPesos, datosProv.cotizacionUsada, datosProv.fechaCotizacion)
             paramIndex += 5
           }
@@ -466,11 +469,7 @@ export async function POST(request: NextRequest) {
             paramIndex += 4
           }
           
-          // Construir UPDATE dinámico
-          let updateSQL = '"precioCompra" = EXCLUDED."precioCompra", "ordenPreferencia" = EXCLUDED."ordenPreferencia"'
-          if (camposMonedaExisten) {
-            updateSQL += `, "moneda" = $5, "precioEnDolares" = EXCLUDED."precioEnDolares", "precioEnPesos" = EXCLUDED."precioEnPesos", "cotizacionUsada" = EXCLUDED."cotizacionUsada", "fechaCotizacion" = EXCLUDED."fechaCotizacion"`
-          }
+          // Continuar construyendo UPDATE dinámico (updateSQL ya está declarado arriba)
           if (camposPresentacionExisten) {
             updateSQL += ', "unidadCompra" = EXCLUDED."unidadCompra", "cantidadPorUnidadCompra" = EXCLUDED."cantidadPorUnidadCompra"'
           }
@@ -486,9 +485,46 @@ export async function POST(request: NextRequest) {
               "updatedAt" = NOW()
           `
           
+          console.log('[API PRODUCTOS POST] SQL a ejecutar:', sqlQueryFinal)
+          console.log('[API PRODUCTOS POST] Parámetros:', params.map((p, i) => `$${i + 1} = ${p} (${typeof p})`))
+          
           await tx.$executeRawUnsafe(sqlQueryFinal, ...params)
           
-          console.log('[API PRODUCTOS POST] Proveedor guardado exitosamente con moneda:', monedaParaGuardar)
+          // VERIFICACIÓN CRÍTICA: Leer directamente de la BD qué se guardó
+          const verificarMoneda = await tx.$queryRawUnsafe<Array<{ moneda: string | null }>>(`
+            SELECT "moneda" FROM "producto_proveedor" 
+            WHERE "productoId" = $1 AND "proveedorId" = $2
+          `, datosProv.productoId, datosProv.proveedorId)
+          
+          console.log('[API PRODUCTOS POST] ⚠️ VERIFICACIÓN POST-GUARDADO:', {
+            productoId: datosProv.productoId,
+            proveedorId: datosProv.proveedorId,
+            monedaEnviada: monedaParaGuardar,
+            monedaGuardadaEnBD: verificarMoneda[0]?.moneda,
+            tipoMonedaEnBD: typeof verificarMoneda[0]?.moneda,
+            COINCIDE: verificarMoneda[0]?.moneda === monedaParaGuardar ? '✅ SÍ' : '❌ NO'
+          })
+          
+          // Si no coincide, hacer UPDATE directo como último recurso
+          if (verificarMoneda[0]?.moneda !== monedaParaGuardar && camposMonedaExisten) {
+            console.log('[API PRODUCTOS POST] ⚠️ MONEDA NO COINCIDE - Haciendo UPDATE directo...')
+            await tx.$executeRawUnsafe(`
+              UPDATE "producto_proveedor" 
+              SET "moneda" = $1 
+              WHERE "productoId" = $2 AND "proveedorId" = $3
+            `, monedaParaGuardar, datosProv.productoId, datosProv.proveedorId)
+            
+            // Verificar de nuevo
+            const verificarMoneda2 = await tx.$queryRawUnsafe<Array<{ moneda: string | null }>>(`
+              SELECT "moneda" FROM "producto_proveedor" 
+              WHERE "productoId" = $1 AND "proveedorId" = $2
+            `, datosProv.productoId, datosProv.proveedorId)
+            
+            console.log('[API PRODUCTOS POST] ✅ Verificación después de UPDATE directo:', {
+              monedaGuardada: verificarMoneda2[0]?.moneda,
+              COINCIDE: verificarMoneda2[0]?.moneda === monedaParaGuardar ? '✅ SÍ' : '❌ NO'
+            })
+          }
         }
       }
 

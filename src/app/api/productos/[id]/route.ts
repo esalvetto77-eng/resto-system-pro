@@ -455,7 +455,8 @@ export async function PUT(
             if (camposMonedaExisten) {
               camposSQL += ', "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion"'
               valoresSQL += `, $${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}`
-              updateSQL += `, "moneda" = $${paramIndex}, "precioEnDolares" = EXCLUDED."precioEnDolares", "precioEnPesos" = EXCLUDED."precioEnPesos", "cotizacionUsada" = EXCLUDED."cotizacionUsada", "fechaCotizacion" = EXCLUDED."fechaCotizacion"`
+              // CRÍTICO: Usar EXCLUDED."moneda" para tomar el valor del INSERT, no el parámetro
+              updateSQL += `, "moneda" = EXCLUDED."moneda", "precioEnDolares" = EXCLUDED."precioEnDolares", "precioEnPesos" = EXCLUDED."precioEnPesos", "cotizacionUsada" = EXCLUDED."cotizacionUsada", "fechaCotizacion" = EXCLUDED."fechaCotizacion"`
               params.push(monedaParaGuardar, datosProv.precioEnDolares, datosProv.precioEnPesos, datosProv.cotizacionUsada, datosProv.fechaCotizacion)
               paramIndex += 5
             }
@@ -484,9 +485,46 @@ export async function PUT(
                 "updatedAt" = NOW()
             `
             
+            console.log('[API PRODUCTO PUT] SQL a ejecutar:', sqlQuery)
+            console.log('[API PRODUCTO PUT] Parámetros:', params.map((p, i) => `$${i + 1} = ${p} (${typeof p})`))
+            
             await tx.$executeRawUnsafe(sqlQuery, ...params)
             
-            console.log('[API PRODUCTO PUT] Proveedor guardado exitosamente con moneda:', monedaParaGuardar)
+            // VERIFICACIÓN CRÍTICA: Leer directamente de la BD qué se guardó
+            const verificarMoneda = await tx.$queryRawUnsafe<Array<{ moneda: string | null }>>(`
+              SELECT "moneda" FROM "producto_proveedor" 
+              WHERE "productoId" = $1 AND "proveedorId" = $2
+            `, datosProv.productoId, datosProv.proveedorId)
+            
+            console.log('[API PRODUCTO PUT] ⚠️ VERIFICACIÓN POST-GUARDADO:', {
+              productoId: datosProv.productoId,
+              proveedorId: datosProv.proveedorId,
+              monedaEnviada: monedaParaGuardar,
+              monedaGuardadaEnBD: verificarMoneda[0]?.moneda,
+              tipoMonedaEnBD: typeof verificarMoneda[0]?.moneda,
+              COINCIDE: verificarMoneda[0]?.moneda === monedaParaGuardar ? '✅ SÍ' : '❌ NO'
+            })
+            
+            // Si no coincide, hacer UPDATE directo como último recurso
+            if (verificarMoneda[0]?.moneda !== monedaParaGuardar && camposMonedaExisten) {
+              console.log('[API PRODUCTO PUT] ⚠️ MONEDA NO COINCIDE - Haciendo UPDATE directo...')
+              await tx.$executeRawUnsafe(`
+                UPDATE "producto_proveedor" 
+                SET "moneda" = $1 
+                WHERE "productoId" = $2 AND "proveedorId" = $3
+              `, monedaParaGuardar, datosProv.productoId, datosProv.proveedorId)
+              
+              // Verificar de nuevo
+              const verificarMoneda2 = await tx.$queryRawUnsafe<Array<{ moneda: string | null }>>(`
+                SELECT "moneda" FROM "producto_proveedor" 
+                WHERE "productoId" = $1 AND "proveedorId" = $2
+              `, datosProv.productoId, datosProv.proveedorId)
+              
+              console.log('[API PRODUCTO PUT] ✅ Verificación después de UPDATE directo:', {
+                monedaGuardada: verificarMoneda2[0]?.moneda,
+                COINCIDE: verificarMoneda2[0]?.moneda === monedaParaGuardar ? '✅ SÍ' : '❌ NO'
+              })
+            }
           }
           
           console.log('[API PRODUCTO PUT] Relaciones de proveedores creadas exitosamente')
