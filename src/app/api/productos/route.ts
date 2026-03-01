@@ -405,32 +405,22 @@ export async function POST(request: NextRequest) {
         
         // Insertar proveedores según si los campos existen o no (verificado antes de la transacción)
         for (const datosProv of proveedoresParaCrear) {
-          // Asegurar que la moneda tenga un valor válido ANTES de cualquier inserción
-          // Validar explícitamente que sea string y que sea 'USD' o 'UYU'
-          let monedaFinal: string = 'UYU' // Default seguro
-          if (typeof datosProv.moneda === 'string') {
+          // SOLUCIÓN SIMPLE Y DIRECTA: Normalizar moneda
+          let monedaParaGuardar = 'UYU'
+          if (datosProv.moneda === 'USD' || datosProv.moneda === 'UYU') {
+            monedaParaGuardar = datosProv.moneda
+          } else if (typeof datosProv.moneda === 'string') {
             const monedaUpper = datosProv.moneda.toUpperCase().trim()
             if (monedaUpper === 'USD' || monedaUpper === 'UYU') {
-              monedaFinal = monedaUpper
+              monedaParaGuardar = monedaUpper
             }
           }
           
-          // ACTUALIZAR datosProv.moneda con el valor final validado
-          datosProv.moneda = monedaFinal
-          
-          console.log('[API PRODUCTOS POST] Guardando proveedor:', {
+          console.log('[API PRODUCTOS POST] 🔵 MONEDA A GUARDAR:', {
             proveedorId: datosProv.proveedorId,
             monedaRecibida: datosProv.moneda,
-            tipoMonedaRecibida: typeof datosProv.moneda,
-            monedaFinal: monedaFinal,
-            tipoMonedaFinal: typeof monedaFinal,
-            precioCompra: datosProv.precioCompra,
-            precioEnDolares: datosProv.precioEnDolares,
-            precioEnPesos: datosProv.precioEnPesos
+            monedaFinal: monedaParaGuardar
           })
-          
-          // SOLUCIÓN EFICAZ: Usar SQL crudo con parámetros seguros para garantizar que moneda se guarde
-          const monedaParaGuardar: string = monedaFinal || 'UYU'
           
           console.log('[API PRODUCTOS POST] Guardando proveedor con moneda:', {
             proveedorId: datosProv.proveedorId,
@@ -488,16 +478,18 @@ export async function POST(request: NextRequest) {
           console.log('[API PRODUCTOS POST] SQL a ejecutar:', sqlQueryFinal)
           console.log('[API PRODUCTOS POST] Parámetros:', params.map((p, i) => `$${i + 1} = ${p} (${typeof p})`))
           
+          // PRIMERO: Hacer el INSERT/UPDATE normal
           await tx.$executeRawUnsafe(sqlQueryFinal, ...params)
           
-          // SOLUCIÓN DEFINITIVA: SIEMPRE hacer UPDATE directo de moneda después de INSERT/UPDATE
+          // SEGUNDO: SIEMPRE hacer UPDATE directo de moneda (esto es lo que realmente funciona)
           if (camposMonedaExisten) {
-            console.log('[API PRODUCTOS POST] 🔧 UPDATE DIRECTO de moneda:', monedaParaGuardar)
-            await tx.$executeRawUnsafe(`
+            console.log('[API PRODUCTOS POST] 🔧 EJECUTANDO UPDATE DIRECTO de moneda:', monedaParaGuardar)
+            const updateResult = await tx.$executeRawUnsafe(`
               UPDATE "producto_proveedor" 
-              SET "moneda" = $1 
+              SET "moneda" = $1::text
               WHERE "productoId" = $2 AND "proveedorId" = $3
             `, monedaParaGuardar, datosProv.productoId, datosProv.proveedorId)
+            console.log('[API PRODUCTOS POST] ✅ UPDATE ejecutado, filas afectadas:', updateResult)
           }
           
           // VERIFICACIÓN CRÍTICA: Leer directamente de la BD qué se guardó
