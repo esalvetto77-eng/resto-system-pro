@@ -64,28 +64,48 @@ export async function GET(
       )
     }
 
+    // Verificar si la columna moneda existe antes de leerla
+    let camposMonedaExisten = false
+    try {
+      await prisma.$queryRawUnsafe(`SELECT "moneda" FROM "producto_proveedor" LIMIT 1`)
+      camposMonedaExisten = true
+      console.log('[API PRODUCTO GET] Columna moneda existe en BD')
+    } catch (error: any) {
+      if (error?.meta?.code === '42703' || error?.message?.includes('does not exist')) {
+        camposMonedaExisten = false
+        console.log('[API PRODUCTO GET] Columna moneda NO existe en BD')
+      }
+    }
+
     // Leer campos adicionales usando SQL directo
     if (producto.proveedores.length > 0) {
       try {
         const proveedorIds = producto.proveedores.map(pp => pp.id)
         const idsList = proveedorIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',')
+        
+        // Construir query dinámicamente según qué campos existen
+        let camposSelect = 'id'
+        if (camposMonedaExisten) {
+          camposSelect += ', "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion"'
+        }
+        // Intentar leer campos de presentación e IVA (si fallan, se ignoran)
+        try {
+          await prisma.$queryRawUnsafe(`SELECT "unidadCompra" FROM "producto_proveedor" LIMIT 1`)
+          camposSelect += ', "unidadCompra", "cantidadPorUnidadCompra"'
+        } catch {}
+        try {
+          await prisma.$queryRawUnsafe(`SELECT "tipoIVA" FROM "producto_proveedor" LIMIT 1`)
+          camposSelect += ', "tipoIVA", "precioIngresadoConIVA", "precioConIVA", "precioSinIVA"'
+        } catch {}
+        
         const query = `
-          SELECT 
-            id,
-            "moneda",
-            "precioEnDolares",
-            "precioEnPesos",
-            "cotizacionUsada",
-            "fechaCotizacion",
-            "unidadCompra",
-            "cantidadPorUnidadCompra",
-            "tipoIVA",
-            "precioIngresadoConIVA",
-            "precioConIVA",
-            "precioSinIVA"
+          SELECT ${camposSelect}
           FROM "producto_proveedor"
           WHERE id IN (${idsList})
         `
+        
+        console.log('[API PRODUCTO GET] Query para leer campos adicionales:', query)
+        
         const camposAdicionales = await prisma.$queryRawUnsafe<Array<{
           id: string
           moneda?: string | null
@@ -101,18 +121,36 @@ export async function GET(
           precioSinIVA?: number | null
         }>>(query)
         
+        console.log('[API PRODUCTO GET] Campos adicionales leídos:', camposAdicionales.map(c => ({
+          id: c.id,
+          moneda: c.moneda,
+          tipoMoneda: typeof c.moneda
+        })))
+        
         const camposMap = new Map(camposAdicionales.map(c => [c.id, c]))
         
         const productoConCampos = {
           ...producto,
-          proveedores: producto.proveedores.map(pp => ({
-            ...pp,
-            ...(camposMap.get(pp.id) || {}),
-          })),
+          proveedores: producto.proveedores.map(pp => {
+            const campos = camposMap.get(pp.id) || {}
+            // Si no hay moneda pero hay precioEnDolares, asumir USD
+            const monedaFinal = campos.moneda || (campos.precioEnDolares ? 'USD' : 'UYU')
+            console.log('[API PRODUCTO GET] Procesando proveedor:', pp.id, {
+              monedaEnBD: campos.moneda,
+              precioEnDolares: campos.precioEnDolares,
+              monedaFinal: monedaFinal
+            })
+            return {
+              ...pp,
+              ...campos,
+              moneda: monedaFinal, // Asegurar que siempre haya una moneda
+            }
+          }),
         }
         
         return NextResponse.json(productoConCampos)
-      } catch (error) {
+      } catch (error: any) {
+        console.error('[API PRODUCTO GET] Error al leer campos adicionales:', error)
         return NextResponse.json(producto)
       }
     }
@@ -288,11 +326,29 @@ export async function PUT(
 
           // GARANTÍA FINAL: UPDATE directo de moneda si existe
           if (camposMonedaExisten) {
-            await tx.$executeRawUnsafe(`
+            console.log('[API PRODUCTO PUT] 🔧 Ejecutando UPDATE directo de moneda:', {
+              moneda: moneda,
+              productoId: params.id,
+              proveedorId: prov.proveedorId
+            })
+            const updateResult = await tx.$executeRawUnsafe(`
               UPDATE "producto_proveedor" 
               SET "moneda" = $1::text
               WHERE "productoId" = $2 AND "proveedorId" = $3
             `, moneda, params.id, prov.proveedorId)
+            console.log('[API PRODUCTO PUT] ✅ UPDATE ejecutado, filas afectadas:', updateResult)
+            
+            // VERIFICACIÓN: Leer qué se guardó realmente
+            const verificarMoneda = await tx.$queryRawUnsafe<Array<{ moneda: string | null }>>(`
+              SELECT "moneda" FROM "producto_proveedor" 
+              WHERE "productoId" = $1 AND "proveedorId" = $2
+            `, params.id, prov.proveedorId)
+            
+            console.log('[API PRODUCTO PUT] ⚠️ VERIFICACIÓN POST-GUARDADO:', {
+              monedaEnviada: moneda,
+              monedaGuardadaEnBD: verificarMoneda[0]?.moneda,
+              COINCIDE: verificarMoneda[0]?.moneda === moneda ? '✅ SÍ' : '❌ NO'
+            })
           }
         }
       }

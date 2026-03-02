@@ -302,11 +302,29 @@ export async function POST(request: NextRequest) {
 
           // GARANTÍA FINAL: UPDATE directo de moneda si existe
           if (camposMonedaExisten) {
-            await tx.$executeRawUnsafe(`
+            console.log('[API PRODUCTOS POST] 🔧 Ejecutando UPDATE directo de moneda:', {
+              moneda: moneda,
+              productoId: nuevoProducto.id,
+              proveedorId: prov.proveedorId
+            })
+            const updateResult = await tx.$executeRawUnsafe(`
               UPDATE "producto_proveedor" 
               SET "moneda" = $1::text
               WHERE "productoId" = $2 AND "proveedorId" = $3
             `, moneda, nuevoProducto.id, prov.proveedorId)
+            console.log('[API PRODUCTOS POST] ✅ UPDATE ejecutado, filas afectadas:', updateResult)
+            
+            // VERIFICACIÓN: Leer qué se guardó realmente
+            const verificarMoneda = await tx.$queryRawUnsafe<Array<{ moneda: string | null }>>(`
+              SELECT "moneda" FROM "producto_proveedor" 
+              WHERE "productoId" = $1 AND "proveedorId" = $2
+            `, nuevoProducto.id, prov.proveedorId)
+            
+            console.log('[API PRODUCTOS POST] ⚠️ VERIFICACIÓN POST-GUARDADO:', {
+              monedaEnviada: moneda,
+              monedaGuardadaEnBD: verificarMoneda[0]?.moneda,
+              COINCIDE: verificarMoneda[0]?.moneda === moneda ? '✅ SÍ' : '❌ NO'
+            })
           }
 
           console.log('[API PRODUCTOS POST] ✅ Proveedor creado:', {
