@@ -246,14 +246,14 @@ export async function PUT(
           let camposSQL = '"productoId", "proveedorId", "precioCompra", "ordenPreferencia"'
           let valoresSQL = '$1, $2, $3, $4'
           let updateSQL = '"precioCompra" = EXCLUDED."precioCompra", "ordenPreferencia" = EXCLUDED."ordenPreferencia"'
-          let params: any[] = [params.id, prov.proveedorId, precioCompra, prov.ordenPreferencia || 1]
+          let sqlParams: any[] = [params.id, prov.proveedorId, precioCompra, prov.ordenPreferencia || 1]
           let paramIndex = 5
 
           if (camposMonedaExisten) {
             camposSQL += ', "moneda", "precioEnDolares", "precioEnPesos", "cotizacionUsada", "fechaCotizacion"'
             valoresSQL += `, $${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}`
             updateSQL += `, "moneda" = EXCLUDED."moneda", "precioEnDolares" = EXCLUDED."precioEnDolares", "precioEnPesos" = EXCLUDED."precioEnPesos", "cotizacionUsada" = EXCLUDED."cotizacionUsada", "fechaCotizacion" = EXCLUDED."fechaCotizacion"`
-            params.push(moneda, precioEnDolares, precioEnPesos, moneda === 'USD' ? cotizacionActual : null, moneda === 'USD' && cotizacionActual ? new Date() : null)
+            sqlParams.push(moneda, precioEnDolares, precioEnPesos, moneda === 'USD' ? cotizacionActual : null, moneda === 'USD' && cotizacionActual ? new Date() : null)
             paramIndex += 5
           }
 
@@ -261,7 +261,7 @@ export async function PUT(
             camposSQL += ', "unidadCompra", "cantidadPorUnidadCompra"'
             valoresSQL += `, $${paramIndex}, $${paramIndex + 1}`
             updateSQL += ', "unidadCompra" = EXCLUDED."unidadCompra", "cantidadPorUnidadCompra" = EXCLUDED."cantidadPorUnidadCompra"'
-            params.push(prov.unidadCompra?.trim() || null, prov.cantidadPorUnidadCompra ? Number(prov.cantidadPorUnidadCompra) : null)
+            sqlParams.push(prov.unidadCompra?.trim() || null, prov.cantidadPorUnidadCompra ? Number(prov.cantidadPorUnidadCompra) : null)
             paramIndex += 2
           }
 
@@ -269,7 +269,7 @@ export async function PUT(
             camposSQL += ', "tipoIVA", "precioIngresadoConIVA", "precioConIVA", "precioSinIVA"'
             valoresSQL += `, $${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}`
             updateSQL += ', "tipoIVA" = EXCLUDED."tipoIVA", "precioIngresadoConIVA" = EXCLUDED."precioIngresadoConIVA", "precioConIVA" = EXCLUDED."precioConIVA", "precioSinIVA" = EXCLUDED."precioSinIVA"'
-            params.push(prov.tipoIVA || null, prov.precioIngresadoConIVA || false, precioConIVA, precioSinIVA)
+            sqlParams.push(prov.tipoIVA || null, prov.precioIngresadoConIVA || false, precioConIVA, precioSinIVA)
             paramIndex += 4
           }
 
@@ -284,7 +284,7 @@ export async function PUT(
             ON CONFLICT ("productoId", "proveedorId") DO UPDATE SET
               ${updateSQL},
               "updatedAt" = NOW()
-          `, ...params)
+          `, ...sqlParams)
 
           // GARANTÍA FINAL: UPDATE directo de moneda si existe
           if (camposMonedaExisten) {
